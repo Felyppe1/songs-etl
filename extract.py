@@ -10,7 +10,7 @@ SPOTIFY_BASE_URL = 'https://api.spotify.com/v1'
 USER_IDS = [
     { 'name': 'Bruna', 'id': 'vo3yf0r7oen9jj4f5393oyuwf' },
     { 'name': 'Felyppe', 'id': 'felyppe123' },
-    { 'name': 'Isaac', 'id': '721howy7jowgka4xexlqfm9cm' },
+    { 'name': 'Isaac', 'id': '721howy7jowgka4xexlqfm9cm' }
 ]
 
 def get_access_token():
