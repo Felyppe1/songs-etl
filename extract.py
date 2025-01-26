@@ -5,6 +5,7 @@ import json
 
 load_dotenv(override=True)
 
+SERVICE_ACCOUNT_JSON_PATH = os.path.join(os.path.dirname(__file__), 'gcp-sa-credentials.json')
 BEYONCE_ID = '6vWDO969PvNqNYHIOW5v0m'
 SPOTIFY_BASE_URL = 'https://api.spotify.com/v1'
 USER_IDS = [
@@ -30,11 +31,11 @@ def get_access_token():
     response.raise_for_status()
     print(response.json())
 
-def upload_object_to_bucket(bucket_name, source_file, destination_blob_name, service_account_file):
+def upload_object_to_bucket(bucket_name, source_file, destination_blob_name):
     from google.cloud import storage
 
     try:
-        client = storage.Client.from_service_account_json(service_account_file)
+        client = storage.Client.from_service_account_json(SERVICE_ACCOUNT_JSON_PATH)
         bucket = client.get_bucket(bucket_name)
 
         blob = bucket.blob(destination_blob_name)
@@ -45,11 +46,11 @@ def upload_object_to_bucket(bucket_name, source_file, destination_blob_name, ser
     except Exception as e:
         print(f'Error uploading file: {str(e)}')
 
-def upload_json_to_bucket(bucket_name, json_data, destination_blob_name, service_account_file):
+def upload_json_to_bucket(bucket_name, json_data, destination_blob_name):
     from google.cloud import storage
 
     try:
-        client = storage.Client.from_service_account_json(service_account_file)
+        client = storage.Client.from_service_account_json(SERVICE_ACCOUNT_JSON_PATH)
         bucket = client.get_bucket(bucket_name)
 
         blob = bucket.blob(destination_blob_name)
@@ -127,7 +128,6 @@ def extract():
             bucket_name='meu-primeiro-data-lake',
             json_data=playlists,
             destination_blob_name=f'bronze/playlists_by_user/user_id_{user["id"]}.json',
-            service_account_file=os.path.join(os.path.dirname(__file__), 'gcp-sa-credentials.json')
         )
 
         print(f'User: {user["name"]}')
@@ -154,7 +154,6 @@ def extract():
                 bucket_name='meu-primeiro-data-lake',
                 json_data=tracks,
                 destination_blob_name=f'bronze/tracks_by_playlist/playlist_id_{playlist["id"]}.json',
-                service_account_file=os.path.join(os.path.dirname(__file__), 'gcp-sa-credentials.json')
             )
 
         print()
