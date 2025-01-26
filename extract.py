@@ -116,44 +116,44 @@ def get_tracks_by_playlist_id(playlist_id, limit=100, offset=0):
 
 def extract():
     for user in USER_IDS:
-        playlist_with_most_songs = None
-        total_songs = 0
-
         playlists = get_playlists_by_user_id(user['id'])
-        for playlist in playlists['items']:
 
-            playlist_total_songs = playlist['tracks']['total']
+        playlists = {
+            'user_id': user['id'],
+            'data': playlists
+        }
 
-            if playlist_total_songs > total_songs:
-                playlist_with_most_songs = playlist
-                total_songs = playlist_total_songs
+        upload_json_to_bucket(
+            bucket_name='meu-primeiro-data-lake',
+            json_data=playlists,
+            destination_blob_name=f'bronze/playlists_by_user/user_id_{user["id"]}.json',
+            service_account_file=os.path.join(os.path.dirname(__file__), 'gcp-sa-credentials.json')
+        )
 
         print(f'User: {user["name"]}')
-        if playlist_with_most_songs:
-            playlist_with_most_songs['user_id'] = user['id']
-
-            upload_json_to_bucket(
-                bucket_name='meu-primeiro-data-lake',
-                json_data=playlist_with_most_songs,
-                destination_blob_name=f'bronze/playlists/playlist_id_{playlist_with_most_songs["id"]}.json',
-                service_account_file=os.path.join(os.path.dirname(__file__), 'gcp-sa-credentials.json')
-            )
-            
+        for playlist in playlists['data']['items']:
             all_tracks = []
             offset = 0
 
             while True:
-                tracks = get_tracks_by_playlist_id(playlist_with_most_songs['id'], limit=100, offset=offset)
+                tracks = get_tracks_by_playlist_id(playlist['id'], limit=100, offset=offset)
+
+                all_tracks.extend(tracks['items'])
+                
                 if tracks['next'] == None:
                     break
                 
-                all_tracks.extend(tracks['items'])
                 offset += 100
+            
+            tracks = {
+                'playlist_id': playlist['id'],
+                'data': all_tracks
+            }
             
             upload_json_to_bucket(
                 bucket_name='meu-primeiro-data-lake',
-                json_data=all_tracks,
-                destination_blob_name=f'bronze/tracks_by_playlist/playlist_id_{playlist_with_most_songs["id"]}.json',
+                json_data=tracks,
+                destination_blob_name=f'bronze/tracks_by_playlist/playlist_id_{playlist["id"]}.json',
                 service_account_file=os.path.join(os.path.dirname(__file__), 'gcp-sa-credentials.json')
             )
 
