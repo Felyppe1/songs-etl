@@ -1,3 +1,4 @@
+import functions_framework
 from dotenv import load_dotenv
 from requests import post
 import pandas as pd
@@ -9,72 +10,53 @@ from google.cloud.storage import Blob
 
 load_dotenv(override=True)
 
-SERVICE_ACCOUNT_JSON_PATH = os.path.join(os.path.dirname(__file__), 'gcp-sa-credentials.json')
-
-def get_access_token():
-    url = 'https://accounts.spotify.com/api/token'
-
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded'
-    }
-
-    data = {
-        'grant_type': 'client_credentials',
-        'client_id': os.environ['SPOTIFY_CLIENT_ID'],
-        'client_secret': os.environ['SPOTIFY_CLIENT_SECRET'],
-    }
-
-    response = post(url, headers=headers, data=data)
-    response.raise_for_status()
-    print(response.json())
+PROJECT = os.getenv('GCP_PROJECT_ID')
+if not PROJECT:
+    raise ValueError("GCP_PROJECT_ID environment variable not set.")
 
 def retrieve_object_from_bucket(bucket_name, object_path):
     from google.cloud import storage
     
     try:
-        client = storage.Client.from_service_account_json(SERVICE_ACCOUNT_JSON_PATH)
+        client = storage.Client()
 
         bucket = client.get_bucket(bucket_name)
         blob = bucket.blob(object_path)
-        print(blob)
         object = blob.download_as_text()
-        print(object)
-
-        # df = pd.read_json(io.StringIO(object))
 
         print(f"Object '{object_path}' retrieved.")
         return object
 
     except Exception as e:
-        print(f"Error: {e}")
+        raise Exception(f"Error while getting objects from bucket: {e}")
 
 def retrieve_blobs_from_bucket(bucket_name, object_path) -> List[Blob]:
     from google.cloud import storage
     
     try:
-        client = storage.Client.from_service_account_json(SERVICE_ACCOUNT_JSON_PATH)
+        client = storage.Client()
 
         bucket = client.get_bucket(bucket_name)
-        blobs = list(bucket.list_blobs(prefix=object_path))
+        blobs = bucket.list_blobs(prefix=object_path)
 
         print(f"Blobs from '{object_path}' retrieved.")
         return blobs
 
     except Exception as e:
-        print(f"Error: {e}")
+        raise Exception(f"Error while getting blobs from bucket: {e}")
 
-def upload_dataframe_to_bigquery(df, dataset_table, project):
+def upload_dataframe_to_bigquery(df, dataset_table):
     try:
-        pandas_gbq.to_gbq(df, dataset_table, project)
-        print(f'Dataframe uploaded to the BigQuery table: {dataset_table}.{project}')
+        pandas_gbq.to_gbq(df, dataset_table, PROJECT, if_exists='replace')
+        print(f'Dataframe uploaded to the BigQuery table: {dataset_table}.{PROJECT}')
 
     except Exception as e:
-        print(f'An error occurred while uploading dataframe to BigQuery: {e}')
+        raise Exception(f'An error occurred while uploading dataframe to BigQuery: {e}')
 
 
 def transform():
     playlists_df = pd.DataFrame(columns=['playlist_id', 'name', 'description', 'image', 'user_id'])
-    
+
     user_playlists_blobs = retrieve_blobs_from_bucket('meu-primeiro-data-lake', 'bronze/playlists_by_user')
 
     for blob in user_playlists_blobs:
@@ -90,7 +72,7 @@ def transform():
                 user_playlists['user_id'],
             ]
 
-    upload_dataframe_to_bigquery(playlists_df, 'silver_songs.playlists', os.environ['GCP_PROJECT_ID'])
+    upload_dataframe_to_bigquery(playlists_df, 'silver_songs.playlists')
 
     tracks_df = pd.DataFrame(columns=['track_id', 'name', 'duration_ms', 'is_explicit', 'added_at', 'is_local', 'artist_id', 'playlist_id'])
 
@@ -112,8 +94,10 @@ def transform():
                 'playlist_id': playlist_tracks['playlist_id'],
             }
     
-    upload_dataframe_to_bigquery(tracks_df, 'silver_songs.tracks', os.environ['GCP_PROJECT_ID'])
+    upload_dataframe_to_bigquery(tracks_df, 'silver_songs.tracks')
 
-# get_access_token()
+@functions_framework.http
+def main(request):
+    transform()
 
-transform()
+    return 'Transformation completed.'

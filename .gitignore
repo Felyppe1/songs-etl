@@ -1,3 +1,8 @@
 gcp-sa-credentials.json
 .env
-/venv
+venv
+.terraform
+terraform.tfvars
+terraform.tfstate
+terraform.tfstate.*
+.terraform.lock.hcl

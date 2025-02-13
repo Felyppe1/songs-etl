@@ -1,3 +1,4 @@
+import functions_framework
 from dotenv import load_dotenv
 from requests import post, get
 import os
@@ -5,16 +6,25 @@ import json
 
 load_dotenv(override=True)
 
-SERVICE_ACCOUNT_JSON_PATH = os.path.join(os.path.dirname(__file__), 'gcp-sa-credentials.json')
+SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
+SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
+if not SPOTIFY_CLIENT_ID:
+    raise ValueError('SPOTIFY_CLIENT_ID environment variable not set.')
+if not SPOTIFY_CLIENT_SECRET:
+    raise ValueError('SPOTIFY_CLIENT_SECRET environment variable not set.')
+
+SPOTIFY_ACCESS_TOKEN = None
 BEYONCE_ID = '6vWDO969PvNqNYHIOW5v0m'
 SPOTIFY_BASE_URL = 'https://api.spotify.com/v1'
 USER_IDS = [
     { 'name': 'Bruna', 'id': 'vo3yf0r7oen9jj4f5393oyuwf' },
-    { 'name': 'Felyppe', 'id': 'felyppe123' },
-    { 'name': 'Isaac', 'id': '721howy7jowgka4xexlqfm9cm' }
+    # { 'name': 'Felyppe', 'id': 'felyppe123' },
+    # { 'name': 'Isaac', 'id': '721howy7jowgka4xexlqfm9cm' }
 ]
 
 def get_access_token():
+    global SPOTIFY_ACCESS_TOKEN
+
     url = 'https://accounts.spotify.com/api/token'
 
     headers = {
@@ -29,13 +39,13 @@ def get_access_token():
 
     response = post(url, headers=headers, data=data)
     response.raise_for_status()
-    print(response.json())
+    SPOTIFY_ACCESS_TOKEN = response.json()['access_token']
 
 def upload_object_to_bucket(bucket_name, source_file, destination_blob_name):
     from google.cloud import storage
 
     try:
-        client = storage.Client.from_service_account_json(SERVICE_ACCOUNT_JSON_PATH)
+        client = storage.Client() # There is no need to use from_service_account_json because in the CF it can authenticate normally.
         bucket = client.get_bucket(bucket_name)
 
         blob = bucket.blob(destination_blob_name)
@@ -44,13 +54,13 @@ def upload_object_to_bucket(bucket_name, source_file, destination_blob_name):
         print(f'File {source_file} uploaded to {bucket_name}/{destination_blob_name}')
     
     except Exception as e:
-        print(f'Error uploading file: {str(e)}')
+        raise Exception(f'Error uploading object to {bucket_name}: {str(e)}')
 
 def upload_json_to_bucket(bucket_name, json_data, destination_blob_name):
     from google.cloud import storage
 
     try:
-        client = storage.Client.from_service_account_json(SERVICE_ACCOUNT_JSON_PATH)
+        client = storage.Client()
         bucket = client.get_bucket(bucket_name)
 
         blob = bucket.blob(destination_blob_name)
@@ -59,15 +69,14 @@ def upload_json_to_bucket(bucket_name, json_data, destination_blob_name):
         print(f'JSON data uploaded to {bucket_name}/{destination_blob_name}')
     
     except Exception as e:
-        print(f'Error uploading data: {str(e)}')
-        raise e
+        raise Exception(f'Error uploading json to {bucket_name}: {str(e)}')
 
 
 def get_an_artist_by_id(artist_id):
     url = f'{SPOTIFY_BASE_URL}/artists/{artist_id}'
 
     headers = {
-        'Authorization': f'Bearer {os.environ["SPOTIFY_ACCESS_TOKEN"]}'
+        'Authorization': f'Bearer {SPOTIFY_ACCESS_TOKEN}'
     }
 
     response = get(url, headers=headers)
@@ -80,7 +89,7 @@ def get_all_albums_by_artist_id(artist_id):
     url = f'{SPOTIFY_BASE_URL}/artists/{artist_id}/albums?include_groups=album'
 
     headers = {
-        'Authorization': f'Bearer {os.environ["SPOTIFY_ACCESS_TOKEN"]}'
+        'Authorization': f'Bearer {SPOTIFY_ACCESS_TOKEN}'
     }
 
     response = get(url, headers=headers)
@@ -94,7 +103,7 @@ def get_playlists_by_user_id(user_id):
     url = f'{SPOTIFY_BASE_URL}/users/{user_id}/playlists'
 
     headers = {
-        'Authorization': f'Bearer {os.environ["SPOTIFY_ACCESS_TOKEN"]}'
+        'Authorization': f'Bearer {SPOTIFY_ACCESS_TOKEN}'
     }
 
     response = get(url, headers=headers)
@@ -106,7 +115,7 @@ def get_tracks_by_playlist_id(playlist_id, limit=100, offset=0):
     url = f'{SPOTIFY_BASE_URL}/playlists/{playlist_id}/tracks?limit={limit}&offset={offset}'
 
     headers = {
-        'Authorization': f'Bearer {os.environ["SPOTIFY_ACCESS_TOKEN"]}'
+        'Authorization': f'Bearer {SPOTIFY_ACCESS_TOKEN}'
     }
 
     response = get(url, headers=headers)
@@ -158,7 +167,11 @@ def extract():
 
         print()
 
-        
-# get_access_token()
 
-extract()
+@functions_framework.http
+def main(request):
+    get_access_token()
+
+    extract()
+
+    return 'Extraction completed.'
