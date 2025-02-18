@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from requests import post, get
 import os
 import json
+from google.cloud import bigquery
 
 load_dotenv(override=True)
 
@@ -16,11 +17,6 @@ if not SPOTIFY_CLIENT_SECRET:
 SPOTIFY_ACCESS_TOKEN = None
 BEYONCE_ID = '6vWDO969PvNqNYHIOW5v0m'
 SPOTIFY_BASE_URL = 'https://api.spotify.com/v1'
-USER_IDS = [
-    { 'name': 'Bruna', 'id': 'vo3yf0r7oen9jj4f5393oyuwf' },
-    # { 'name': 'Felyppe', 'id': 'felyppe123' },
-    # { 'name': 'Isaac', 'id': '721howy7jowgka4xexlqfm9cm' }
-]
 
 def get_access_token():
     global SPOTIFY_ACCESS_TOKEN
@@ -70,6 +66,17 @@ def upload_json_to_bucket(bucket_name, json_data, destination_blob_name):
     
     except Exception as e:
         raise Exception(f'Error uploading json to {bucket_name}: {str(e)}')
+
+def query():
+    client = bigquery.Client()
+    query_job = client.query(f"""
+        SELECT *
+        FROM spotify_etl.users
+    """)
+
+    rows = query_job.result()
+
+    return rows
 
 
 def get_an_artist_by_id(artist_id):
@@ -125,34 +132,42 @@ def get_tracks_by_playlist_id(playlist_id, limit=100, offset=0):
 
 
 def extract():
-    for user in USER_IDS:
-        playlists = get_playlists_by_user_id(user['id'])
+    users = query()
+
+    for user in users:
+        print(f'User: {user["name"]}')
+
+        print('Getting playlists')
+        playlists = get_playlists_by_user_id(user['spotify_id'])
 
         playlists = {
-            'user_id': user['id'],
+            'user_id': user['spotify_id'],
             'data': playlists
         }
 
+        print('Uploading playlists to the bucket')
         upload_json_to_bucket(
             bucket_name='meu-primeiro-data-lake',
             json_data=playlists,
-            destination_blob_name=f'bronze/playlists_by_user/user_id_{user["id"]}.json',
+            destination_blob_name=f'bronze/playlists_by_user/user_id_{user["spotify_id"]}.json',
         )
 
-        print(f'User: {user["name"]}')
+        OFFSET = 100
+
         for playlist in playlists['data']['items']:
             all_tracks = []
             offset = 0
 
             while True:
-                tracks = get_tracks_by_playlist_id(playlist['id'], limit=100, offset=offset)
+                print(f'Getting {OFFSET} tracks from the playlist')
+                tracks = get_tracks_by_playlist_id(playlist['id'], limit=OFFSET, offset=offset)
 
                 all_tracks.extend(tracks['items'])
                 
                 if tracks['next'] == None:
                     break
                 
-                offset += 100
+                offset += OFFSET
             
             tracks = {
                 'playlist_id': playlist['id'],
