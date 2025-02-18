@@ -220,7 +220,7 @@ resource "google_workflows_workflow" "spotify_etl_workflow" {
         - logExtractResponse:
             call: sys.log
             args:
-                text: "$(extract_response.body)"
+                text: "$${extract_response.body}"
         - transform:
             call: http.post
             args:
@@ -231,7 +231,7 @@ resource "google_workflows_workflow" "spotify_etl_workflow" {
         - logTransformResponse:
             call: sys.log
             args:
-                text: "$(transform_response.body)"
+                text: "$${transform_response.body}"
     EOT
 
     deletion_protection = false
