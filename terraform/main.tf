@@ -1,4 +1,27 @@
-resource "google_service_account" "gcp_sa" {
+# Activate APIs
+resource "google_project_service" "required_apis" {
+    for_each = toset([
+        "secretmanager.googleapis.com",
+        "cloudresourcemanager.googleapis.com",
+        "cloudfunctions.googleapis.com",
+        "cloudscheduler.googleapis.com",
+        "monitoring.googleapis.com",
+        "iam.googleapis.com",
+        "iamcredentials.googleapis.com",
+        "logging.googleapis.com",
+        "storage.googleapis.com",
+        "run.googleapis.com",
+        "workflowexecutions.googleapis.com",
+        "cloudbuild.googleapis.com"
+    ])
+
+    project = var.project
+    service = each.value
+
+    disable_on_destroy         = false
+}
+
+resource "google_service_account" "service_account" {
     project = var.project
     account_id = "sa-engenharia-de-dados"
     display_name = "Service Account for Data Engineer"
@@ -9,30 +32,31 @@ resource "google_project_iam_member" "sa_roles_runner" {
         "roles/cloudfunctions.invoker",
         "roles/run.invoker",
         "roles/workflows.invoker",
-        "roles/logging.logWriter"
+        "roles/logging.logWriter",
+        "roles/secretmanager.secretAccessor"
     ])
+
     role = each.value
-    member = "serviceAccount:${google_service_account.gcp_sa.email}"
+    member = "serviceAccount:${google_service_account.service_account.email}"
     project = var.project
 }
 
-# Activate APIs
-# resource "google_project_service" "required_apis" {
-#     for_each = toset([
-#         "cloudresourcemanager.googleapis.com",
-#         "cloudfunctions.googleapis.com",
-#         "monitoring.googleapis.com",
-#         "iam.googleapis.com",
-#         "iamcredentials.googleapis.com",
-#         "logging.googleapis.com",
-#         "storage.googleapis.com",
-#         "run.googleapis.com",
-#     ])
-#     project = var.project
-#     service = each.key
-#     disable_on_destroy         = false
-#     disable_dependent_services = true
-# }
+
+resource "google_service_account" "cloud_functions_service_account" {
+    project = var.project
+    account_id = "cloud-functions-sa"
+    display_name = "Service Account the cloud functions to comunicate with other resources"
+}
+
+resource "google_project_iam_member" "cloud_functions_service_account_roles" {
+    for_each = toset([
+        "roles/secretmanager.secretAccessor"
+    ])
+
+    role = each.value
+    member = "serviceAccount:${google_service_account.cloud_functions_service_account.email}"
+    project = var.project
+}
 
 # module "required_apis" {
 #     source = "terraform-google-modules/project-factory/google"
@@ -77,28 +101,45 @@ resource "google_project_iam_member" "sa_roles_runner" {
 # }
 
 
+resource "google_secret_manager_secret" "spotify_client_id" {
+    secret_id = "spotify-client-id"
+    replication {
+        auto {}
+    }
+}
+
+resource "google_secret_manager_secret" "spotify_client_secret" {
+    secret_id = "spotify-client-secret"
+    replication {
+        auto {}
+    }
+}
 
 resource "google_storage_bucket" "cloud_functions_bucket" {
     name = "cloud-functions-${var.project}"
     location = var.region
     force_destroy = true
     uniform_bucket_level_access = true
+
+    depends_on = [
+        google_project_service.required_apis["storage.googleapis.com"]
+    ]
 }
 
-data "archive_file" "cloud_function_code" {
+data "archive_file" "extract_function_zip" {
     type = "zip"
     source_dir = "${path.module}/../cf_extract"
     output_path = "${path.module}/deploy/cf_extract.zip"
 }
 
-resource "google_storage_bucket_object" "zip" {
-    source = data.archive_file.cloud_function_code.output_path
+resource "google_storage_bucket_object" "extract_function_object" {
+    source = data.archive_file.extract_function_zip.output_path
     content_type = "application/zip"
     name = "extract.zip"
     bucket = google_storage_bucket.cloud_functions_bucket.name
     depends_on = [
         google_storage_bucket.cloud_functions_bucket,
-        data.archive_file.cloud_function_code
+        data.archive_file.extract_function_zip
     ]
 }
 
@@ -119,7 +160,7 @@ resource "google_cloudfunctions2_function" "extract_cloud_function" {
         source {
             storage_source {
                 bucket = google_storage_bucket.cloud_functions_bucket.name
-                object = google_storage_bucket_object.zip.name
+                object = google_storage_bucket_object.extract_function_object.name
             }
         }
     }
@@ -127,28 +168,33 @@ resource "google_cloudfunctions2_function" "extract_cloud_function" {
     service_config {
         max_instance_count = 1
         available_memory = "256M"
-        timeout_seconds = 60
+        timeout_seconds = 120
+        service_account_email = google_service_account.cloud_functions_service_account.email
         environment_variables = {
-            SPOTIFY_CLIENT_ID = var.spotify_client_id
-            SPOTIFY_CLIENT_SECRET = var.spotify_client_secret
+            SPOTIFY_CLIENT_ID = "${var.spotify_client_id}"
+            SPOTIFY_CLIENT_SECRET = "${var.spotify_client_secret}"
         }
     }
+
+    depends_on = [
+        google_project_service.required_apis["cloudfunctions.googleapis.com"]
+    ]
 }
 
-data "archive_file" "transform_cloud_function_code" {
+data "archive_file" "transform_function_zip" {
     type = "zip"
     source_dir = "${path.module}/../cf_transform"
     output_path = "${path.module}/deploy/cf_transform.zip"
 }
 
-resource "google_storage_bucket_object" "transform_zip" {
-    source = data.archive_file.transform_cloud_function_code.output_path
+resource "google_storage_bucket_object" "transform_function_object" {
+    source = data.archive_file.transform_function_zip.output_path
     content_type = "application/zip"
     name = "transform.zip"
     bucket = google_storage_bucket.cloud_functions_bucket.name
     depends_on = [
         google_storage_bucket.cloud_functions_bucket,
-        data.archive_file.transform_cloud_function_code
+        data.archive_file.transform_function_zip
     ]
 }
 
@@ -165,7 +211,7 @@ resource "google_cloudfunctions2_function" "transform_cloud_function" {
         source {
             storage_source {
                 bucket = google_storage_bucket.cloud_functions_bucket.name
-                object = google_storage_bucket_object.transform_zip.name
+                object = google_storage_bucket_object.transform_function_object.name
             }
         }
     }
@@ -176,9 +222,13 @@ resource "google_cloudfunctions2_function" "transform_cloud_function" {
         available_cpu      = "0.583"
         timeout_seconds = 60
         environment_variables = {
-            GCP_PROJECT_ID = var.project
+            GCP_PROJECT_ID = "${var.project}"
         }
     }
+
+    depends_on = [
+        google_project_service.required_apis[""]
+    ]
 }
 
 # resource "google_cloudfunctions2_function_iam_member" "invoker" {
@@ -186,7 +236,7 @@ resource "google_cloudfunctions2_function" "transform_cloud_function" {
 #     location       = var.region
 #     cloud_function = google_cloudfunctions2_function.function.name
 #     role           = "roles/cloudfunctions.invoker"
-#     member         = "serviceAccount:${google_service_account.gcp_sa.email}"
+#     member         = "serviceAccount:${google_service_account.service_account.email}"
 # }
 
 # resource "google_cloud_run_service_iam_member" "cloud_run_invoker" {
@@ -194,7 +244,7 @@ resource "google_cloudfunctions2_function" "transform_cloud_function" {
 #     location = var.function.region
 #     service  = google_cloudfunctions2_function.function.name
 #     role     = "roles/run.invoker"
-#     member   = "serviceAccount:${google_service_account.gcp_sa.email}"
+#     member   = "serviceAccount:${google_service_account.service_account.email}"
 # }
 
 resource "google_workflows_workflow" "spotify_etl_workflow" {
@@ -204,7 +254,7 @@ resource "google_workflows_workflow" "spotify_etl_workflow" {
 
     description = "Workflow for the Spotify ETL process"
 
-    service_account = google_service_account.gcp_sa.email
+    service_account = google_service_account.service_account.email
 
     source_contents = <<-EOT
     main:
@@ -235,6 +285,11 @@ resource "google_workflows_workflow" "spotify_etl_workflow" {
     EOT
 
     deletion_protection = false
+    depends_on = [
+        google_project_service.required_apis["workflowexecutions.googleapis.com"],
+        google_cloudfunctions2_function.extract_cloud_function,
+        google_cloudfunctions2_function.transform_cloud_function
+    ]
 }
 
 resource "google_cloud_scheduler_job" "invoke_cloud_function" {
@@ -249,7 +304,13 @@ resource "google_cloud_scheduler_job" "invoke_cloud_function" {
         uri         = "https://workflowexecutions.googleapis.com/v1/projects/${var.project}/locations/${var.region}/workflows/${google_workflows_workflow.spotify_etl_workflow.name}/executions"
         http_method = "POST"
         oauth_token {
-            service_account_email = google_service_account.gcp_sa.email
+            service_account_email = google_service_account.service_account.email
         }
     }
+
+    depends_on = [
+        google_project_service.required_apis["cloudscheduler.googleapis.com"],
+        google_workflows_workflow.spotify_etl_workflow,
+        google_service_account.service_account  
+    ]
 }

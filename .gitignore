@@ -1,4 +1,4 @@
-gcp-sa-credentials.json
+terraform-sa.json
 .env
 venv
 .terraform
@@ -6,3 +6,4 @@ terraform.tfvars
 terraform.tfstate
 terraform.tfstate.*
 .terraform.lock.hcl
+__pycache__

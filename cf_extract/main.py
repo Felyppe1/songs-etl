@@ -1,21 +1,33 @@
 import functions_framework
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from requests import post, get
-import os
+# import os
 import json
 from google.cloud import bigquery
+from google.cloud import secretmanager
 
-load_dotenv(override=True)
+secretManagerClient = secretmanager.SecretManagerServiceClient()
+request = { "name": "projects/785418897463/secrets/spotify-client-id/versions/latest" }
+response = secretManagerClient.access_secret_version(request)
+SPOTIFY_CLIENT_ID = response.payload.data.decode('UTF-8')
 
-SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
-SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
-if not SPOTIFY_CLIENT_ID:
-    raise ValueError('SPOTIFY_CLIENT_ID environment variable not set.')
-if not SPOTIFY_CLIENT_SECRET:
-    raise ValueError('SPOTIFY_CLIENT_SECRET environment variable not set.')
+request = { "name": "projects/785418897463/secrets/spotify-client-secret/versions/latest" }
+response = secretManagerClient.access_secret_version(request)
+SPOTIFY_CLIENT_SECRET = response.payload.data.decode('UTF-8')
+
+print(SPOTIFY_CLIENT_ID)
+print(SPOTIFY_CLIENT_SECRET)
+
+# load_dotenv(override=True)
+
+# SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
+# SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
+# if not SPOTIFY_CLIENT_ID:
+#     raise ValueError('SPOTIFY_CLIENT_ID environment variable not set.')
+# if not SPOTIFY_CLIENT_SECRET:
+#     raise ValueError('SPOTIFY_CLIENT_SECRET environment variable not set.')
 
 SPOTIFY_ACCESS_TOKEN = None
-BEYONCE_ID = '6vWDO969PvNqNYHIOW5v0m'
 SPOTIFY_BASE_URL = 'https://api.spotify.com/v1'
 
 def get_access_token():
@@ -29,8 +41,8 @@ def get_access_token():
 
     data = {
         'grant_type': 'client_credentials',
-        'client_id': os.environ['SPOTIFY_CLIENT_ID'],
-        'client_secret': os.environ['SPOTIFY_CLIENT_SECRET'],
+        'client_id': SPOTIFY_CLIENT_ID,
+        'client_secret': SPOTIFY_CLIENT_SECRET,
     }
 
     response = post(url, headers=headers, data=data)
