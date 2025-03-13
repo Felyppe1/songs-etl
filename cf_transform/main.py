@@ -10,9 +10,9 @@ from google.cloud.storage import Blob
 
 load_dotenv(override=True)
 
-PROJECT = os.getenv('GCP_PROJECT_ID')
-if not PROJECT:
-    raise ValueError("GCP_PROJECT_ID environment variable not set.")
+PROJECT_ID = os.getenv('PROJECT_ID')
+if not PROJECT_ID:
+    raise ValueError("PROJECT_ID environment variable not set.")
 
 def retrieve_object_from_bucket(bucket_name, object_path):
     from google.cloud import storage
@@ -47,8 +47,8 @@ def retrieve_blobs_from_bucket(bucket_name, object_path) -> List[Blob]:
 
 def upload_dataframe_to_bigquery(df, dataset_table):
     try:
-        pandas_gbq.to_gbq(df, dataset_table, PROJECT, if_exists='replace')
-        print(f'Dataframe uploaded to the BigQuery table: {dataset_table}.{PROJECT}')
+        pandas_gbq.to_gbq(df, dataset_table, PROJECT_ID, if_exists='replace')
+        print(f'Dataframe uploaded to the BigQuery table: {dataset_table}.{PROJECT_ID}')
 
     except Exception as e:
         raise Exception(f'An error occurred while uploading dataframe to BigQuery: {e}')
@@ -57,7 +57,7 @@ def upload_dataframe_to_bigquery(df, dataset_table):
 def transform():
     playlists_df = pd.DataFrame(columns=['playlist_id', 'name', 'description', 'image', 'user_id'])
 
-    user_playlists_blobs = retrieve_blobs_from_bucket('meu-primeiro-data-lake', 'bronze/playlists_by_user')
+    user_playlists_blobs = retrieve_blobs_from_bucket(f'landing-{PROJECT_ID}', 'playlists_by_user')
 
     for blob in user_playlists_blobs:
         user_playlists_json = blob.download_as_text()
@@ -72,11 +72,11 @@ def transform():
                 user_playlists['user_id'],
             ]
 
-    upload_dataframe_to_bigquery(playlists_df, 'silver_songs.playlists')
+    upload_dataframe_to_bigquery(playlists_df, 'songs.playlists')
 
     tracks_df = pd.DataFrame(columns=['track_id', 'name', 'duration_ms', 'is_explicit', 'added_at', 'is_local', 'artist_id', 'playlist_id'])
 
-    playlist_tracks_blobs = retrieve_blobs_from_bucket('meu-primeiro-data-lake', 'bronze/tracks_by_playlist')
+    playlist_tracks_blobs = retrieve_blobs_from_bucket(f'landing-{PROJECT_ID}', 'tracks_by_playlist')
 
     for blob in playlist_tracks_blobs:
         playlist_tracks_json = blob.download_as_text()
@@ -94,7 +94,7 @@ def transform():
                 'playlist_id': playlist_tracks['playlist_id'],
             }
     
-    upload_dataframe_to_bigquery(tracks_df, 'silver_songs.tracks')
+    upload_dataframe_to_bigquery(tracks_df, 'songs.tracks')
 
 @functions_framework.http
 def main(request):

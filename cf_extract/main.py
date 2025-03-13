@@ -1,24 +1,31 @@
 import functions_framework
-# from dotenv import load_dotenv
+from dotenv import load_dotenv
 from requests import post, get
-# import os
+import os
 import json
 from google.cloud import bigquery
 from google.cloud import secretmanager
 
+load_dotenv(override=True)
+
+PROJECT_ID = os.getenv('PROJECT_ID')
+if not PROJECT_ID:
+    raise ValueError('PROJECT_ID environment variable is not set')
+
+SONGS_SECRET_NAME = os.getenv('SONGS_SECRET_NAME')
+if not SONGS_SECRET_NAME:
+    raise ValueError('SONGS_SECRET_NAME environment variable is not set')
+
 secretManagerClient = secretmanager.SecretManagerServiceClient()
-request = { "name": "projects/785418897463/secrets/spotify-client-id/versions/latest" }
+
+request = { "name": f"projects/{PROJECT_ID}/secrets/{SONGS_SECRET_NAME}/versions/latest" }
 response = secretManagerClient.access_secret_version(request)
-SPOTIFY_CLIENT_ID = response.payload.data.decode('UTF-8')
 
-request = { "name": "projects/785418897463/secrets/spotify-client-secret/versions/latest" }
-response = secretManagerClient.access_secret_version(request)
-SPOTIFY_CLIENT_SECRET = response.payload.data.decode('UTF-8')
+credentials_str = response.payload.data.decode('UTF-8')
+credentials = json.loads(credentials_str)
 
-print(SPOTIFY_CLIENT_ID)
-print(SPOTIFY_CLIENT_SECRET)
-
-# load_dotenv(override=True)
+SPOTIFY_CLIENT_ID = credentials.get('spotify_client_id')
+SPOTIFY_CLIENT_SECRET = credentials.get('spotify_client_secret')
 
 # SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
 # SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
@@ -83,7 +90,7 @@ def query():
     client = bigquery.Client()
     query_job = client.query(f"""
         SELECT *
-        FROM spotify_etl.users
+        FROM songs.users
     """)
 
     rows = query_job.result()
@@ -150,18 +157,18 @@ def extract():
         print(f'User: {user["name"]}')
 
         print('Getting playlists')
-        playlists = get_playlists_by_user_id(user['spotify_id'])
+        playlists = get_playlists_by_user_id(user['user_id'])
 
         playlists = {
-            'user_id': user['spotify_id'],
+            'user_id': user['user_id'],
             'data': playlists
         }
 
         print('Uploading playlists to the bucket')
         upload_json_to_bucket(
-            bucket_name='meu-primeiro-data-lake',
+            bucket_name=f'landing-{PROJECT_ID}',
             json_data=playlists,
-            destination_blob_name=f'bronze/playlists_by_user/user_id_{user["spotify_id"]}.json',
+            destination_blob_name=f'playlists_by_user/user_id_{user["user_id"]}.json',
         )
 
         OFFSET = 100
@@ -187,9 +194,9 @@ def extract():
             }
             
             upload_json_to_bucket(
-                bucket_name='meu-primeiro-data-lake',
+                bucket_name=f'landing-{PROJECT_ID}',
                 json_data=tracks,
-                destination_blob_name=f'bronze/tracks_by_playlist/playlist_id_{playlist["id"]}.json',
+                destination_blob_name=f'tracks_by_playlist/playlist_id_{playlist["id"]}.json',
             )
 
         print()

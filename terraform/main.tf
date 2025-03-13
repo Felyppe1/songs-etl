@@ -101,18 +101,22 @@ resource "google_project_iam_member" "cloud_functions_service_account_roles" {
 # }
 
 
-resource "google_secret_manager_secret" "spotify_client_id" {
-    secret_id = "spotify-client-id"
+resource "google_secret_manager_secret" "songs" {
+    secret_id = "songs"
     replication {
         auto {}
     }
 }
 
-resource "google_secret_manager_secret" "spotify_client_secret" {
-    secret_id = "spotify-client-secret"
-    replication {
-        auto {}
-    }
+resource "google_storage_bucket" "landing_bucket" {
+    name = "landing-${var.project}"
+    location = var.region
+    force_destroy = true
+    uniform_bucket_level_access = true
+
+    depends_on = [
+        google_project_service.required_apis["storage.googleapis.com"]
+    ]
 }
 
 resource "google_storage_bucket" "cloud_functions_bucket" {
@@ -313,4 +317,119 @@ resource "google_cloud_scheduler_job" "invoke_cloud_function" {
         google_workflows_workflow.spotify_etl_workflow,
         google_service_account.service_account  
     ]
+}
+
+resource "google_bigquery_dataset" "songs" {
+    project = var.project
+    dataset_id = "songs"
+    description = "Dataset com todas as tabelas relacionadas a músicas, playlists, cantores, entre outros, para análise"
+    location = var.region
+}
+
+resource "google_bigquery_table" "users" {
+    project = var.project
+    dataset_id = google_bigquery_dataset.songs.dataset_id
+    table_id = "users"
+    description = "Tabela de usuários das plataformas de música"
+    schema = <<SCHEMA
+    [
+        {
+            "name": "user_id",
+            "description": "Identificador do usuário em uma plataforma específica",
+            "type": "STRING"
+        },
+        {
+            "name": "name",
+            "description": "Nome da pessoa (não precisa ser completo)",
+            "type": "STRING"
+        }
+    ]
+    SCHEMA
+}
+
+resource "google_bigquery_table" "playlists" {
+    project = var.project
+    dataset_id = google_bigquery_dataset.songs.dataset_id
+    table_id = "playlists"
+    description = "Tabela das playlists dos usuários"
+    schema = <<SCHEMA
+    [
+        {
+            "name": "playlist_id",
+            "description": "Identificador da playlist em uma plataforma específica",
+            "type": "STRING"
+        },
+        {
+            "name": "name",
+            "description": "Nome da playlist",
+            "type": "STRING"
+        },
+        {
+            "name": "description",
+            "description": "Descrição da playlist",
+            "type": "STRING"
+        },
+        {
+            "name": "image",
+            "description": "Url da imagem da playlist",
+            "type": "STRING"
+        },
+        {
+            "name": "user_id",
+            "description": "Identificador do usuário dono da playlist",
+            "type": "STRING"
+        }
+    ]
+    SCHEMA
+}
+
+resource "google_bigquery_table" "tracks" {
+    project = var.project
+    dataset_id = google_bigquery_dataset.songs.dataset_id
+    table_id = "tracks"
+    description = "Tabela de músicas das playlists dos usuários"
+    schema = <<SCHEMA
+    [
+        {
+            "name": "track_id",
+            "description": "Identificador da da música em uma plataforma específica",
+            "type": "STRING"
+        },
+        {
+            "name": "name",
+            "description": "Nome da música",
+            "type": "STRING"
+        },
+        {
+            "name": "duration_ms",
+            "description": "Tamanho da música em milissegundos",
+            "type": "INTEGER"
+        },
+        {
+            "name": "is_explicit",
+            "description": "Flag para saber se a música é considerada explícita",
+            "type": "BOOLEAN"
+        },
+        {
+            "name": "added_at",
+            "description": "Data do dia em que a música foi adicionda à playlist",
+            "type": "STRING"
+        },
+        {
+            "name": "is_local",
+            "description": "Flag para saber se a música é um arquivo externo à plataforma",
+            "type": "BOOLEAN"
+        },
+        {
+            "name": "artist_id",
+            "description": "Identificador do artista em uma plataforma específica",
+            "type": "STRING"
+        },
+        {
+            "name": "playlist_id",
+            "description": "Identificador da playlist em uma plataforma específica",
+            "type": "STRING"
+        }
+    ]
+    SCHEMA
 }
