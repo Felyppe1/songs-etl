@@ -1,3 +1,7 @@
+locals {
+    service_account = "serviceAccount:${google_service_account.service_account.email}"
+}
+
 variable "project" {
     description = "Project id in the cloud"
 }

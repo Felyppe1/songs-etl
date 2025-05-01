@@ -16,24 +16,8 @@ SONGS_SECRET_NAME = os.getenv('SONGS_SECRET_NAME')
 if not SONGS_SECRET_NAME:
     raise ValueError('SONGS_SECRET_NAME environment variable is not set')
 
-secretManagerClient = secretmanager.SecretManagerServiceClient()
-
-request = { "name": f"projects/{PROJECT_ID}/secrets/{SONGS_SECRET_NAME}/versions/latest" }
-response = secretManagerClient.access_secret_version(request)
-
-credentials_str = response.payload.data.decode('UTF-8')
-credentials = json.loads(credentials_str)
-
-SPOTIFY_CLIENT_ID = credentials.get('spotify_client_id')
-SPOTIFY_CLIENT_SECRET = credentials.get('spotify_client_secret')
-
-# SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
-# SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
-# if not SPOTIFY_CLIENT_ID:
-#     raise ValueError('SPOTIFY_CLIENT_ID environment variable not set.')
-# if not SPOTIFY_CLIENT_SECRET:
-#     raise ValueError('SPOTIFY_CLIENT_SECRET environment variable not set.')
-
+SPOTIFY_CLIENT_ID = None
+SPOTIFY_CLIENT_SECRET = None
 SPOTIFY_ACCESS_TOKEN = None
 SPOTIFY_BASE_URL = 'https://api.spotify.com/v1'
 
@@ -201,9 +185,27 @@ def extract():
 
         print()
 
+def get_secret_manager_secret():
+    global SPOTIFY_CLIENT_ID
+    global SPOTIFY_CLIENT_SECRET
+
+    print('Getting secret manager secret')
+    
+    secretManagerClient = secretmanager.SecretManagerServiceClient()
+
+    request = { "name": f"projects/{PROJECT_ID}/secrets/{SONGS_SECRET_NAME}/versions/latest" }
+    response = secretManagerClient.access_secret_version(request)
+
+    credentials = json.loads(response.payload.data.decode('UTF-8'))
+
+    SPOTIFY_CLIENT_ID = credentials.get('spotify_client_id')
+    SPOTIFY_CLIENT_SECRET = credentials.get('spotify_client_secret')
+
 
 @functions_framework.http
 def main(request):
+    get_secret_manager_secret()
+
     get_access_token()
 
     extract()
