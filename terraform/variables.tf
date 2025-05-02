@@ -10,19 +10,6 @@ variable "region" {
     description = "Region where the resources will be created"
 }
 
-variable "service_key" {
-    description = "Caminho para a chave de serviço para autenticação"
-    sensitive = true
-}
-
-variable "spotify_client_id" {
-  description = "Spotify client id"
-  type        = string
-  sensitive   = true
-}
-
-variable "spotify_client_secret" {
-  description = "Spotify client secret"
-  type        = string
-  sensitive   = true
+variable "songs_secret_manager_name" {
+    description = "Name of the secret manager used in the cloud function extract"
 }

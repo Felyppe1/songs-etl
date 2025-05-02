@@ -39,8 +39,8 @@ resource "google_cloudfunctions2_function" "extract_cloud_function" {
         timeout_seconds = 400
         service_account_email = google_service_account.cloud_functions_service_account.email
         environment_variables = {
-            SPOTIFY_CLIENT_ID = "${var.spotify_client_id}"
-            SPOTIFY_CLIENT_SECRET = "${var.spotify_client_secret}"
+            PROJECT_ID = "${var.project}"
+            SONGS_SECRET_NAME = "${var.songs_secret_manager_name}"
         }
     }
 
@@ -95,7 +95,7 @@ resource "google_cloudfunctions2_function" "transform_cloud_function" {
         available_cpu      = "0.583"
         timeout_seconds = 400
         environment_variables = {
-            GCP_PROJECT_ID = "${var.project}"
+            PROJECT_ID = "${var.project}"
         }
     }
 
