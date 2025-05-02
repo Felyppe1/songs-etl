@@ -8,6 +8,8 @@ on:
 jobs:
   terraform:
     runs-on: ubuntu-latest
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/terraform-sa.json
 
     steps:
       - name: Checkout code
@@ -15,6 +17,9 @@ jobs:
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v1
+
+      - name: Write service account JSON
+        run: echo "${{ secrets.TERRAFORM_SA }}" > terraform-sa.json
 
       - name: Create tfvars file
         run: |
