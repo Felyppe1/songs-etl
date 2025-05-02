@@ -26,7 +26,7 @@ jobs:
 
       - name: Create tfvars file
         run: |
-          cat <<EOF > ${{ github.workspace }}/secrets.tfvars
+          cat <<EOF > ${{ github.workspace }}/terraform/secrets.tfvars
           project                       = "${{ secrets.PROJECT_ID }}"
           region                        = "${{ secrets.REGION }}"
           songs_secret_manager_name     = "${{ secrets.SONGS_SECRET_MANAGER_NAME }}"
