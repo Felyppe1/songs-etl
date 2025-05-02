@@ -19,7 +19,7 @@ jobs:
         uses: hashicorp/setup-terraform@v1
 
       - name: Write service account JSON
-        run: echo "${{ secrets.TERRAFORM_SA }}" > ${{ github.workspace }}/terraform-sa.json
+        run: printf '%s' "${{ secrets.TERRAFORM_SA }}" > ${{ github.workspace }}/terraform-sa.json
 
       - name: Create tfvars file
         run: |
