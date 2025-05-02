@@ -20,7 +20,7 @@ jobs:
 
       - name: Write service account JSON
         run: |
-          cat <<EOF > credentials.json
+          cat <<EOF > ${{ github.workspace }}/terraform-sa.json
           ${{ secrets.TERRAFORM_SA }}
           EOF
 
