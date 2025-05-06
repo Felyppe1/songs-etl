@@ -13,7 +13,7 @@ resource "google_bigquery_table" "users" {
     schema = <<SCHEMA
     [
         {
-            "name": "user_id",
+            "name": "spotify_id",
             "description": "Identificador do usuário em uma plataforma específica",
             "type": "STRING"
         },
@@ -123,6 +123,28 @@ resource "google_bigquery_dataset" "fact_songs" {
     description = "Dataset for multidimensional modeling about playlists management by a user in a platform"
     location = var.region
 }
+
+resource "google_bigquery_table" "users" {
+    project    = var.project
+    dataset_id = google_bigquery_dataset.fact_songs.dataset_id
+    table_id   = "users"
+    description = "Table of users from music platforms"
+    schema = <<SCHEMA
+    [
+        {
+            "name": "spotify_id",
+            "description": "User identifier on a specific platform",
+            "type": "STRING"
+        },
+        {
+            "name": "name",
+            "description": "Person's name (does not need to be full)",
+            "type": "STRING"
+        }
+    ]
+    SCHEMA
+}
+
 
 resource "google_bigquery_table" "dim_platform" {
     project = var.project

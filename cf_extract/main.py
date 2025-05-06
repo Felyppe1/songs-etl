@@ -5,6 +5,8 @@ import os
 import json
 from google.cloud import bigquery
 from google.cloud import secretmanager
+from typing import Dict, Iterator
+from datetime import date
 
 load_dotenv(override=True)
 
@@ -21,24 +23,10 @@ SPOTIFY_CLIENT_SECRET = None
 SPOTIFY_ACCESS_TOKEN = None
 SPOTIFY_BASE_URL = 'https://api.spotify.com/v1'
 
-def get_access_token():
-    global SPOTIFY_ACCESS_TOKEN
 
-    url = 'https://accounts.spotify.com/api/token'
-
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded'
-    }
-
-    data = {
-        'grant_type': 'client_credentials',
-        'client_id': SPOTIFY_CLIENT_ID,
-        'client_secret': SPOTIFY_CLIENT_SECRET,
-    }
-
-    response = post(url, headers=headers, data=data)
-    response.raise_for_status()
-    SPOTIFY_ACCESS_TOKEN = response.json()['access_token']
+###################################################################################
+# Functions to interact with the GCP
+###################################################################################
 
 def upload_object_to_bucket(bucket_name, source_file, destination_blob_name):
     from google.cloud import storage
@@ -58,6 +46,9 @@ def upload_object_to_bucket(bucket_name, source_file, destination_blob_name):
 def upload_json_to_bucket(bucket_name, json_data, destination_blob_name):
     from google.cloud import storage
 
+    if destination_blob_name[0] == '/':
+        destination_blob_name = destination_blob_name[1:]
+
     try:
         client = storage.Client()
         bucket = client.get_bucket(bucket_name)
@@ -69,8 +60,45 @@ def upload_json_to_bucket(bucket_name, json_data, destination_blob_name):
     
     except Exception as e:
         raise Exception(f'Error uploading json to {bucket_name}: {str(e)}')
+    
+def iterate_object_from_bucket(bucket_name, object_path) -> Iterator[Dict]:
+    from google.cloud import storage
+    
+    try:
+        client = storage.Client()
 
-def query():
+        bucket = client.get_bucket(bucket_name)
+        blobs = bucket.list_blobs(prefix=object_path)
+
+        for blob in blobs:
+            blob_json = blob.download_as_text()
+            blob_dict = json.loads(blob_json)
+
+            yield blob_dict
+
+        print(f"Data from '{object_path}' retrieved.")
+
+    except Exception as e:
+        raise Exception(f"Error while getting blobs from bucket: {e}")
+    
+def retrieve_object_from_bucket(bucket_name, object_path):
+    from google.cloud import storage
+    
+    try:
+        client = storage.Client()
+
+        bucket = client.get_bucket(bucket_name)
+        blob = bucket.blob(object_path)
+        json_data = blob.download_as_text()
+
+        print(f"Object '{object_path}' retrieved.")
+
+        return json.loads(json_data)
+
+    except Exception as e:
+        raise Exception(f"Error while getting objects from bucket: {e}")
+    
+def get_users_from_bigquery():
     client = bigquery.Client()
     query_job = client.query(f"""
         SELECT *
@@ -81,6 +109,44 @@ def query():
 
     return rows
 
+def get_secret_manager_secret():
+    global SPOTIFY_CLIENT_ID
+    global SPOTIFY_CLIENT_SECRET
+
+    print('Getting secret manager secret')
+    
+    secretManagerClient = secretmanager.SecretManagerServiceClient()
+
+    request = { "name": f"projects/{PROJECT_ID}/secrets/{SONGS_SECRET_NAME}/versions/latest" }
+    response = secretManagerClient.access_secret_version(request)
+
+    credentials = json.loads(response.payload.data.decode('UTF-8'))
+
+    SPOTIFY_CLIENT_ID = credentials.get('spotify_client_id')
+    SPOTIFY_CLIENT_SECRET = credentials.get('spotify_client_secret')
+
+###################################################################################
+# Functions to interact with the Spotify API
+###################################################################################
+
+def get_access_token():
+    global SPOTIFY_ACCESS_TOKEN
+
+    url = 'https://accounts.spotify.com/api/token'
+
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded'
+    }
+
+    data = {
+        'grant_type': 'client_credentials',
+        'client_id': SPOTIFY_CLIENT_ID,
+        'client_secret': SPOTIFY_CLIENT_SECRET,
+    }
+
+    response = post(url, headers=headers, data=data)
+    response.raise_for_status()
+    SPOTIFY_ACCESS_TOKEN = response.json()['access_token']
 
 def get_an_artist_by_id(artist_id):
     url = f'{SPOTIFY_BASE_URL}/artists/{artist_id}'
@@ -121,8 +187,8 @@ def get_playlists_by_user_id(user_id):
 
     return response.json()
 
-def get_tracks_by_playlist_id(playlist_id, limit=100, offset=0):
-    url = f'{SPOTIFY_BASE_URL}/playlists/{playlist_id}/tracks?limit={limit}&offset={offset}'
+def get_tracks_by_playlist_id(playlist_id, limit=100, offset=0, fields=''):
+    url = f'{SPOTIFY_BASE_URL}/playlists/{playlist_id}/tracks?limit={limit}&offset={offset}&fields={fields}'
 
     headers = {
         'Authorization': f'Bearer {SPOTIFY_ACCESS_TOKEN}'
@@ -134,72 +200,98 @@ def get_tracks_by_playlist_id(playlist_id, limit=100, offset=0):
     return response.json()
 
 
-def extract():
-    users = query()
+###################################################################################
+# Steps of the extraction
+###################################################################################
+
+def extract_spotify_playlists():
+    users = get_users_from_bigquery()
+
+    all_playlists = []
 
     for user in users:
         print(f'User: {user["name"]}')
 
         print('Getting playlists')
-        playlists = get_playlists_by_user_id(user['user_id'])
+        playlists = get_playlists_by_user_id(user['user_id']) # TODO: change to spotify_id
 
-        playlists = {
+        playlists_dict = {
             'user_id': user['user_id'],
-            'data': playlists
+            'playlists': playlists['items']
         }
 
-        print('Uploading playlists to the bucket')
-        upload_json_to_bucket(
-            bucket_name=f'landing-{PROJECT_ID}',
-            json_data=playlists,
-            destination_blob_name=f'playlists_by_user/user_id_{user["user_id"]}.json',
-        )
+        all_playlists.append(playlists_dict)
 
-        OFFSET = 100
+    print('Uploading playlists to the bucket')
+    upload_json_to_bucket(
+        bucket_name=f'landing-{PROJECT_ID}',
+        json_data=all_playlists,
+        destination_blob_name=f'spotify/playlists/{date.today()}.json',
+    )
 
-        for playlist in playlists['data']['items']:
+def extract_spotify_tracks():
+    LIMIT = 100
+
+    users_playlists = retrieve_object_from_bucket(f'landing-{PROJECT_ID}', f'spotify/playlists/{date.today()}.json')
+
+    all_playlists = []
+
+    for user_playlists in users_playlists:
+        for playlist in user_playlists['playlists']:
             all_tracks = []
             offset = 0
 
             while True:
-                print(f'Getting {OFFSET} tracks from the playlist')
-                tracks = get_tracks_by_playlist_id(playlist['id'], limit=OFFSET, offset=offset)
+                tracks = get_tracks_by_playlist_id(playlist['id'], limit=LIMIT, offset=offset)
+                print(f'Got {len(tracks["items"])} tracks from the API')
 
-                all_tracks.extend(tracks['items'])
+                # all_tracks.extend(tracks['items'])
+
+                for track in tracks['items']:
+                    # print(track['track']['name'], track['track']['album']['total_tracks'])
+
+                    all_tracks.append({
+                        'added_at': track['added_at'],
+                        'is_local': track['is_local'],
+                        'id': track['track']['id'],
+                        'name': track['track']['name'],
+                        'duration_ms': track['track']['duration_ms'],
+                        'explicit': track['track']['explicit'],
+                        'album': {
+                            'id': track['track']['album']['id'],
+                            'name': track['track']['album']['name'],
+                            'release_date': track['track']['album']['release_date'],
+                            'total_tracks': track['track']['album']['total_tracks'],
+                            'images': track['track']['album']['images'],
+                        },
+                        'artists': [
+                            {
+                                'id': artist['id'],
+                                'name': artist['name']
+                            }
+                            for artist in track['track']['artists']
+                        ]
+                    })
                 
                 if tracks['next'] == None:
                     break
                 
-                offset += OFFSET
+                offset += LIMIT
             
             tracks = {
                 'playlist_id': playlist['id'],
                 'data': all_tracks
             }
-            
-            upload_json_to_bucket(
-                bucket_name=f'landing-{PROJECT_ID}',
-                json_data=tracks,
-                destination_blob_name=f'tracks_by_playlist/playlist_id_{playlist["id"]}.json',
-            )
 
-        print()
-
-def get_secret_manager_secret():
-    global SPOTIFY_CLIENT_ID
-    global SPOTIFY_CLIENT_SECRET
-
-    print('Getting secret manager secret')
+            all_playlists.append(tracks)
     
-    secretManagerClient = secretmanager.SecretManagerServiceClient()
+    print('Uploading playlists to the bucket')
+    upload_json_to_bucket(
+        bucket_name=f'landing-{PROJECT_ID}',
+        json_data=all_playlists,
+        destination_blob_name=f'spotify/tracks/{date.today()}.json',
+    )
 
-    request = { "name": f"projects/{PROJECT_ID}/secrets/{SONGS_SECRET_NAME}/versions/latest" }
-    response = secretManagerClient.access_secret_version(request)
-
-    credentials = json.loads(response.payload.data.decode('UTF-8'))
-
-    SPOTIFY_CLIENT_ID = credentials.get('spotify_client_id')
-    SPOTIFY_CLIENT_SECRET = credentials.get('spotify_client_secret')
 
 
 @functions_framework.http
@@ -208,6 +300,8 @@ def main(request):
 
     get_access_token()
 
-    extract()
+    extract_spotify_playlists()
+
+    extract_spotify_tracks()
 
     return 'Extraction completed.'
