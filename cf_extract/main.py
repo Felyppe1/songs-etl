@@ -102,7 +102,7 @@ def get_users_from_bigquery():
     client = bigquery.Client()
     query_job = client.query(f"""
         SELECT *
-        FROM songs.users
+        FROM fact_songs.users
     """)
 
     rows = query_job.result()
@@ -213,7 +213,7 @@ def extract_spotify_playlists():
         print(f'User: {user["name"]}')
 
         print('Getting playlists')
-        playlists = get_playlists_by_user_id(user['user_id']) # TODO: change to spotify_id
+        playlists = get_playlists_by_user_id(user['spotify_id'])
 
         playlists_dict = {
             'user_id': user['user_id'],
