@@ -5,28 +5,6 @@ resource "google_bigquery_dataset" "songs" {
     location = var.region
 }
 
-resource "google_bigquery_table" "users" {
-    project = var.project
-    dataset_id = google_bigquery_dataset.songs.dataset_id
-    table_id = "users"
-    description = "Tabela de usuários das plataformas de música"
-    schema = <<SCHEMA
-    [
-        {
-            "name": "spotify_id",
-            "description": "Identificador do usuário em uma plataforma específica",
-            "type": "STRING"
-        },
-        {
-            "name": "name",
-            "description": "Nome da pessoa (não precisa ser completo)",
-            "type": "STRING"
-        }
-    ]
-    SCHEMA
-    deletion_protection = false
-}
-
 resource "google_bigquery_table" "playlists" {
     project = var.project
     dataset_id = google_bigquery_dataset.songs.dataset_id
