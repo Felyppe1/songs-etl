@@ -5,26 +5,26 @@ resource "google_bigquery_dataset" "fact_songs" {
     location = var.region
 }
 
-# resource "google_bigquery_table" "users" {
-#     project    = var.project
-#     dataset_id = google_bigquery_dataset.fact_songs.dataset_id
-#     table_id   = "users"
-#     description = "Table of users from music platforms"
-#     schema = <<SCHEMA
-#     [
-#         {
-#             "name": "spotify_id",
-#             "description": "User identifier on a specific platform",
-#             "type": "STRING"
-#         },
-#         {
-#             "name": "name",
-#             "description": "Person's name (does not need to be full)",
-#             "type": "STRING"
-#         }
-#     ]
-#     SCHEMA
-# }
+resource "google_bigquery_table" "users" {
+    project    = var.project
+    dataset_id = google_bigquery_dataset.fact_songs.dataset_id
+    table_id   = "users"
+    description = "Table of users from music platforms"
+    schema = <<SCHEMA
+    [
+        {
+            "name": "spotify_id",
+            "description": "User identifier on a specific platform",
+            "type": "STRING"
+        },
+        {
+            "name": "name",
+            "description": "Person's name (does not need to be full)",
+            "type": "STRING"
+        }
+    ]
+    SCHEMA
+}
 
 
 resource "google_bigquery_table" "dim_platform" {
