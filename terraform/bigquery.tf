@@ -157,6 +157,32 @@ resource "google_bigquery_table" "dim_artist" {
     SCHEMA
 }
 
+resource "google_bigquery_table" "dim_track" {
+    project    = var.project
+    dataset_id = google_bigquery_dataset.fact_songs.dataset_id
+    table_id   = "dim_track"
+    description = "Dimension table for tracks"
+    schema = <<SCHEMA
+    [
+        {
+            "name": "dim_track_id",
+            "description": "Surrogate key of the track",
+            "type": "STRING"
+        },
+        {
+            "name": "track_id",
+            "description": "Identifier of the track in the platform",
+            "type": "STRING"
+        },
+        {
+            "name": "name",
+            "description": "Track name",
+            "type": "STRING"
+        }
+    ]
+    SCHEMA
+}
+
 resource "google_bigquery_table" "fact_songs" {
     project    = var.project
     dataset_id = google_bigquery_dataset.fact_songs.dataset_id
@@ -177,6 +203,11 @@ resource "google_bigquery_table" "fact_songs" {
         {
             "name": "dim_artist_id",
             "description": "Foreign key to dim_artist",
+            "type": "STRING"
+        },
+        {
+            "name": "dim_track_id",
+            "description": "Foreign key to dim_track",
             "type": "STRING"
         },
         {
