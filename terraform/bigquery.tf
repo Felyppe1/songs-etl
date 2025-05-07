@@ -165,22 +165,22 @@ resource "google_bigquery_table" "fact_songs" {
     schema = <<SCHEMA
     [
         {
-            "name": "platform_id",
+            "name": "dim_platform_id",
             "description": "Foreign key to dim_platform",
             "type": "STRING"
         },
         {
-            "name": "playlist_id",
+            "name": "dim_playlist_id",
             "description": "Foreign key to dim_playlist",
             "type": "STRING"
         },
         {
-            "name": "artist_id",
+            "name": "dim_artist_id",
             "description": "Foreign key to dim_artist",
             "type": "STRING"
         },
         {
-            "name": "user_id",
+            "name": "dim_user_id",
             "description": "Foreign key to dim_user",
             "type": "STRING"
         },
