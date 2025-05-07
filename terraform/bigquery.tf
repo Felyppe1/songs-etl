@@ -56,8 +56,13 @@ resource "google_bigquery_table" "dim_playlist" {
     schema = <<SCHEMA
     [
         {
+            "name": "dim_playlist_id",
+            "description": "Surrogate key of the playlist",
+            "type": "STRING"
+        },
+        {
             "name": "playlist_id",
-            "description": "Identifier of the playlist",
+            "description": "Identifier of the playlist in the platform",
             "type": "STRING"
         },
         {
