@@ -35,6 +35,11 @@ resource "google_bigquery_table" "dim_platform" {
     schema = <<SCHEMA
     [
         {
+            "name": "dim_platform_id",
+            "description": "Surrogate key of the playlist",
+            "type": "STRING"
+        },
+        {
             "name": "platform_id",
             "description": "Identifier of the platform",
             "type": "STRING"
@@ -82,24 +87,24 @@ resource "google_bigquery_table" "dim_date" {
     schema = <<SCHEMA
     [
         {
-        "name": "date_id",
-        "description": "Date identifier (e.g., YYYYMMDD)",
-        "type": "STRING"
+            "name": "date_id",
+            "description": "Date identifier (e.g., YYYYMMDD)",
+            "type": "STRING"
         },
         {
-        "name": "day",
-        "description": "Day of the month",
-        "type": "INTEGER"
+            "name": "day",
+            "description": "Day of the month",
+            "type": "INTEGER"
         },
         {
-        "name": "month",
-        "description": "Month number",
-        "type": "INTEGER"
+            "name": "month",
+            "description": "Month number",
+            "type": "INTEGER"
         },
         {
-        "name": "year",
-        "description": "Year number",
-        "type": "INTEGER"
+            "name": "year",
+            "description": "Year number",
+            "type": "INTEGER"
         }
     ]
     SCHEMA
@@ -113,14 +118,14 @@ resource "google_bigquery_table" "dim_user" {
     schema = <<SCHEMA
     [
         {
-        "name": "user_id",
-        "description": "Identifier of the user",
-        "type": "STRING"
+            "name": "user_id",
+            "description": "Identifier of the user",
+            "type": "STRING"
         },
         {
-        "name": "name",
-        "description": "User name",
-        "type": "STRING"
+            "name": "name",
+            "description": "User name",
+            "type": "STRING"
         }
     ]
     SCHEMA
@@ -134,14 +139,19 @@ resource "google_bigquery_table" "dim_artist" {
     schema = <<SCHEMA
     [
         {
-        "name": "artist_id",
-        "description": "Identifier of the artist",
-        "type": "STRING"
+            "name": "dim_artist_id",
+            "description": "Surrogate key of the playlist",
+            "type": "STRING"
         },
         {
-        "name": "name",
-        "description": "Artist name",
-        "type": "STRING"
+            "name": "artist_id",
+            "description": "Identifier of the artist in the platform",
+            "type": "STRING"
+        },
+        {
+            "name": "name",
+            "description": "Artist name",
+            "type": "STRING"
         }
     ]
     SCHEMA
@@ -155,44 +165,44 @@ resource "google_bigquery_table" "fact_songs" {
     schema = <<SCHEMA
     [
         {
-        "name": "platform_id",
-        "description": "Foreign key to dim_platform",
-        "type": "STRING"
+            "name": "platform_id",
+            "description": "Foreign key to dim_platform",
+            "type": "STRING"
         },
         {
-        "name": "playlist_id",
-        "description": "Foreign key to dim_playlist",
-        "type": "STRING"
+            "name": "playlist_id",
+            "description": "Foreign key to dim_playlist",
+            "type": "STRING"
         },
         {
-        "name": "artist_id",
-        "description": "Foreign key to dim_artist",
-        "type": "STRING"
+            "name": "artist_id",
+            "description": "Foreign key to dim_artist",
+            "type": "STRING"
         },
         {
-        "name": "user_id",
-        "description": "Foreign key to dim_user",
-        "type": "STRING"
+            "name": "user_id",
+            "description": "Foreign key to dim_user",
+            "type": "STRING"
         },
         {
-        "name": "date_id",
-        "description": "Foreign key to dim_date",
-        "type": "STRING"
+            "name": "date_id",
+            "description": "Foreign key to dim_date",
+            "type": "STRING"
         },
         {
-        "name": "added_at",
-        "description": "Timestamp when the song was added",
-        "type": "TIMESTAMP"
+            "name": "added_at",
+            "description": "Timestamp when the song was added",
+            "type": "TIMESTAMP"
         },
         {
-        "name": "is_local",
-        "description": "Whether the song is a local file",
-        "type": "BOOLEAN"
+            "name": "is_local",
+            "description": "Whether the song is a local file",
+            "type": "BOOLEAN"
         },
         {
-        "name": "position_in_playlist",
-        "description": "Position of the song in the playlist",
-        "type": "INTEGER"
+            "name": "position_in_playlist",
+            "description": "Position of the song in the playlist",
+            "type": "INTEGER"
         }
     ]
     SCHEMA
