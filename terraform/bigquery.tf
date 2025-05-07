@@ -237,4 +237,6 @@ resource "google_bigquery_table" "fact_songs" {
         }
     ]
     SCHEMA
+
+    deletion_protection=false
 }
