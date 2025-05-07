@@ -205,18 +205,19 @@ def get_tracks_by_playlist_id(playlist_id, limit=100, offset=0, fields=''):
 ###################################################################################
 
 def extract_spotify_playlists():
+    print('Extract Spotify playlists')
+
+    print('Getting users from BigQuery')
     users = get_users_from_bigquery()
 
     all_playlists = []
 
     for user in users:
-        print(f'User: {user["name"]}')
-
-        print('Getting playlists')
+        print(f'Getting playlists from user: {user["name"]}')
         playlists = get_playlists_by_user_id(user['spotify_id'])
 
         playlists_dict = {
-            'user_id': user['user_id'],
+            'user_id': user['spotify_id'],
             'playlists': playlists['items']
         }
 
@@ -230,8 +231,11 @@ def extract_spotify_playlists():
     )
 
 def extract_spotify_tracks():
+    print('Extract Spotify tracks')
+
     LIMIT = 100
 
+    print('Getting users playlists from the bucket')    
     users_playlists = retrieve_object_from_bucket(f'landing-{PROJECT_ID}', f'spotify/playlists/{date.today()}.json')
 
     all_playlists = []
@@ -243,7 +247,7 @@ def extract_spotify_tracks():
 
             while True:
                 tracks = get_tracks_by_playlist_id(playlist['id'], limit=LIMIT, offset=offset)
-                print(f'Got {len(tracks["items"])} tracks from the API')
+                print(f'Got {len(tracks["items"])} tracks from the playlist {playlist["id"]}')
 
                 # all_tracks.extend(tracks['items'])
 
@@ -285,7 +289,7 @@ def extract_spotify_tracks():
 
             all_playlists.append(tracks)
     
-    print('Uploading playlists to the bucket')
+    print('Uploading tracks to the bucket')
     upload_json_to_bucket(
         bucket_name=f'landing-{PROJECT_ID}',
         json_data=all_playlists,
