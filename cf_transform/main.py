@@ -1,18 +1,30 @@
 import functions_framework
 from dotenv import load_dotenv
-from requests import post
 import pandas as pd
 import pandas_gbq
 import os
 import json
 from typing import List
 from google.cloud.storage import Blob
+from datetime import date
+
 
 load_dotenv(override=True)
 
 PROJECT_ID = os.getenv('PROJECT_ID')
 if not PROJECT_ID:
     raise ValueError("PROJECT_ID environment variable not set.")
+
+USER_PLAYLISTS_BLOBS = None
+PLAYLIST_TRACKS_BLOBS = None
+
+USERS_PLAYLISTS = None
+PLAYLISTS_TRACKS = None
+
+
+###################################################################################
+# Functions to interact with the GCP
+###################################################################################
 
 def retrieve_object_from_bucket(bucket_name, object_path):
     from google.cloud import storage
@@ -22,10 +34,10 @@ def retrieve_object_from_bucket(bucket_name, object_path):
 
         bucket = client.get_bucket(bucket_name)
         blob = bucket.blob(object_path)
-        object = blob.download_as_text()
+        json_data = blob.download_as_text()
 
         print(f"Object '{object_path}' retrieved.")
-        return object
+        return json.loads(json_data)
 
     except Exception as e:
         raise Exception(f"Error while getting objects from bucket: {e}")
@@ -54,50 +66,51 @@ def upload_dataframe_to_bigquery(df, dataset_table):
         raise Exception(f'An error occurred while uploading dataframe to BigQuery: {e}')
 
 
-def transform():
-    playlists_df = pd.DataFrame(columns=['playlist_id', 'name', 'description', 'image', 'user_id'])
+###################################################################################
+# Steps of the transformation
+###################################################################################
 
-    user_playlists_blobs = retrieve_blobs_from_bucket(f'landing-{PROJECT_ID}', 'playlists_by_user')
+def create_playlist_dimension():
+    playlists_df = pd.DataFrame(columns=['playlist_id', 'name'])
 
-    for blob in user_playlists_blobs:
-        user_playlists_json = blob.download_as_text()
-        user_playlists = json.loads(user_playlists_json)
+    for user_playlists in USERS_PLAYLISTS:
+        # print(json.dumps(user_playlists, indent=2))
 
-        for playlist in user_playlists['data']['items']:
-            playlists_df.loc[len(playlists_df)] = [
-                playlist['id'],
-                playlist['name'],
-                playlist['description'],
-                playlist['images'][0]['url'],
-                user_playlists['user_id'],
-            ]
+        user_playlists_df = pd.DataFrame({
+            'playlist_id': [playlist['id'] for playlist in user_playlists['playlists']],
+            'name': [playlist['name'] for playlist in user_playlists['playlists']],
+        })
 
-    upload_dataframe_to_bigquery(playlists_df, 'songs.playlists')
-
-    tracks_df = pd.DataFrame(columns=['track_id', 'name', 'duration_ms', 'is_explicit', 'added_at', 'is_local', 'artist_id', 'playlist_id'])
-
-    playlist_tracks_blobs = retrieve_blobs_from_bucket(f'landing-{PROJECT_ID}', 'tracks_by_playlist')
-
-    for blob in playlist_tracks_blobs:
-        playlist_tracks_json = blob.download_as_text()
-        playlist_tracks = json.loads(playlist_tracks_json)
-
-        for index, track in enumerate(playlist_tracks['data'], start=len(tracks_df)):
-            tracks_df.loc[index] = {
-                'track_id': track['track']['id'],
-                'name': track['track']['name'],
-                'duration_ms': track['track']['duration_ms'],
-                'is_explicit': track['track']['explicit'],
-                'added_at': track['added_at'],
-                'is_local': track['is_local'],
-                'artist_id': track['track']['artists'][0]['id'],
-                'playlist_id': playlist_tracks['playlist_id'],
-            }
+        playlists_df = pd.concat([playlists_df, user_playlists_df], axis=0)
     
-    upload_dataframe_to_bigquery(tracks_df, 'songs.tracks')
+    upload_dataframe_to_bigquery(playlists_df, 'fact_songs.dim_playlist')
+
+def create_artist_dimension():
+    dim_artists_df = pd.DataFrame(columns=['artist_id', 'name'])
+
+    for playlist_tracks in PLAYLISTS_TRACKS:
+        for tracks in playlist_tracks['data']:
+            artists_df = pd.DataFrame({
+                'artist_id': [artist['id'] for artist in tracks['artists']],
+                'name': [artist['name'] for artist in tracks['artists']],
+            })
+
+            dim_artists_df = pd.concat([dim_artists_df, artists_df])
+    
+    dim_artists_df = pd.DataFrame(dim_artists_df).drop_duplicates()
+
+    upload_dataframe_to_bigquery(dim_artists_df, 'fact_songs.dim_artist')
+
 
 @functions_framework.http
 def main(request):
-    transform()
+    global USERS_PLAYLISTS
+    global PLAYLISTS_TRACKS
+
+    USERS_PLAYLISTS = retrieve_object_from_bucket(f'landing-{PROJECT_ID}', f'spotify/playlists/{date.today()}.json')
+    PLAYLISTS_TRACKS = retrieve_object_from_bucket(f'landing-{PROJECT_ID}', f'spotify/tracks/{date.today()}.json')
+
+    create_playlist_dimension()
+    create_artist_dimension()
 
     return 'Transformation completed.'
