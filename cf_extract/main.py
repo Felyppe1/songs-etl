@@ -265,7 +265,7 @@ def extract_spotify_tracks():
                             'id': track['track']['album']['id'],
                             'name': track['track']['album']['name'],
                             'release_date': track['track']['album']['release_date'],
-                            'total_tracks': track['track']['album']['total_tracks'],
+                            'total_tracks': track['track']['album'].get('total_tracks', 9999), # TODO: check it
                             'images': track['track']['album']['images'],
                         },
                         'artists': [
