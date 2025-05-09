@@ -13,8 +13,13 @@ resource "google_bigquery_table" "users" {
     schema = <<SCHEMA
     [
         {
+            "name": "user_id",
+            "description": "User identifier",
+            "type": "STRING"
+        },
+        {
             "name": "spotify_id",
-            "description": "User identifier on a specific platform",
+            "description": "User identifier on the Spotify",
             "type": "STRING"
         },
         {
@@ -117,6 +122,11 @@ resource "google_bigquery_table" "dim_user" {
     description = "Dimension table for users"
     schema = <<SCHEMA
     [
+        {
+            "name": "dim_user_id",
+            "description": "Surrogate key of the user",
+            "type": "STRING"
+        },
         {
             "name": "user_id",
             "description": "Identifier of the user",
