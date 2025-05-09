@@ -54,10 +54,17 @@ def retrieve_blobs_from_bucket(bucket_name, object_path) -> List[Blob]:
     except Exception as e:
         raise Exception(f"Error while getting blobs from bucket: {e}")
 
-# TODO: send data the right way to bigquery
 def upload_dataframe_to_bigquery(df, dataset_table):
+    client = bigquery.Client()
+
+    job_config = bigquery.LoadJobConfig(
+        write_disposition='WRITE_TRUNCATE'
+    )
+
     try:
-        pandas_gbq.to_gbq(df, dataset_table, PROJECT_ID, if_exists='replace')
+        job = client.load_table_from_dataframe(df, dataset_table, job_config=job_config)
+        job.result()
+
         print(f'Dataframe uploaded to the BigQuery table: {dataset_table}.{PROJECT_ID}')
 
     except Exception as e:
@@ -104,6 +111,9 @@ def create_artist_dimension():
     for playlist_tracks in playlists_tracks:
         for track in playlist_tracks['tracks']:
             for artist in track['artists']:
+                if artist['id'] == None:
+                    continue
+
                 artists.append({
                     'artist_id': artist['id'],
                     'name': artist['name'],
