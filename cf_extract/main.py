@@ -217,7 +217,7 @@ def extract_spotify_playlists():
         playlists = get_playlists_by_user_id(user['spotify_id'])
 
         playlists_dict = {
-            'user_id': user['spotify_id'],
+            'spotify_id': user['spotify_id'],
             'playlists': playlists['items']
         }
 
@@ -284,7 +284,7 @@ def extract_spotify_tracks():
             
             tracks = {
                 'playlist_id': playlist['id'],
-                'data': all_tracks
+                'tracks': all_tracks
             }
 
             all_playlists.append(tracks)

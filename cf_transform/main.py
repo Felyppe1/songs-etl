@@ -54,6 +54,7 @@ def retrieve_blobs_from_bucket(bucket_name, object_path) -> List[Blob]:
     except Exception as e:
         raise Exception(f"Error while getting blobs from bucket: {e}")
 
+# TODO: send data the right way to bigquery
 def upload_dataframe_to_bigquery(df, dataset_table):
     try:
         pandas_gbq.to_gbq(df, dataset_table, PROJECT_ID, if_exists='replace')
@@ -101,7 +102,7 @@ def create_artist_dimension():
     artists = []
 
     for playlist_tracks in playlists_tracks:
-        for track in playlist_tracks['data']:
+        for track in playlist_tracks['tracks']:
             for artist in track['artists']:
                 artists.append({
                     'artist_id': artist['id'],
@@ -122,7 +123,7 @@ def create_track_dimension():
     tracks = []
 
     for playlist_tracks in playlists_tracks:
-        for track in playlist_tracks['data']:
+        for track in playlist_tracks['tracks']:
             track_id = track['id']
             track_name = track['name']
 
@@ -137,9 +138,36 @@ def create_track_dimension():
 
     upload_dataframe_to_bigquery(dim_track_df, 'fact_songs.dim_track')
 
+def create_platform_dimension():
+    print('CREATE PLATFORM DIMENSION')
+
+    platforms = [
+        {
+            'dim_platform_id': 'spotify',
+            'name': 'Spotify',
+        },
+    ]
+
+    dim_platform_df = pd.DataFrame(platforms)
+
+    upload_dataframe_to_bigquery(dim_platform_df, 'fact_songs.dim_platform')
+
+def create_user_dimension():
+    print('CREATE USER DIMENSION')
+
+    users_df = execute_bigquery_query("""
+    SELECT *
+    FROM fact_songs.users
+    """)
+
+    users_df['dim_user_id'] = [CUID_GENERATOR.generate() for _ in range(len(users_df))]
+
+    upload_dataframe_to_bigquery(users_df, 'fact_songs.dim_user')
+
 def create_fact_songs():
     print('CREATE FACT SONGS')
 
+    users_playlists = retrieve_object_from_bucket(f'landing-{PROJECT_ID}', f'spotify/playlists/{date.today()}.json')
     playlists_tracks = retrieve_object_from_bucket(f'landing-{PROJECT_ID}', f'spotify/tracks/{date.today()}.json')
 
     dim_playlist_df = execute_bigquery_query("""
@@ -154,13 +182,30 @@ def create_fact_songs():
     SELECT *
     FROM fact_songs.dim_track
     """)
+    dim_user_df = execute_bigquery_query("""
+    SELECT *
+    FROM fact_songs.dim_user
+    """)
+    users_df = execute_bigquery_query("""
+    SELECT *
+    FROM fact_songs.users
+    """)
 
     songs = []
 
     for playlist_tracks in playlists_tracks:
         playlist_id = playlist_tracks['playlist_id']
 
-        for track in playlist_tracks['data']:
+        spotify_user_id = None
+
+        for user_playlists in users_playlists:
+            for playlist in user_playlists['playlists']:
+                if playlist['id'] == playlist_id:
+                    spotify_user_id = user_playlists['spotify_id']
+
+                    break
+        
+        for track in playlist_tracks['tracks']:
             track_id = track['id']
             added_at = track['added_at']
             is_local = track['is_local']
@@ -171,6 +216,8 @@ def create_fact_songs():
                     'playlist_id': playlist_id,
                     'artist_id': artist['id'],
                     'track_id': track_id,
+                    'spotify_id': spotify_user_id,
+                    'dim_platform_id': 'spotify',
                     'is_local': is_local,
                     'added_at': added_at,
                 })
@@ -180,13 +227,18 @@ def create_fact_songs():
     fact_songs_df = pd.merge(fact_songs_df, dim_playlist_df, how='left', on='playlist_id')
     fact_songs_df = pd.merge(fact_songs_df, dim_artist_df, how='left', on='artist_id')
     fact_songs_df = pd.merge(fact_songs_df, dim_track_df, how='left', on='track_id')
+
+    fact_songs_df = pd.merge(fact_songs_df, users_df[['spotify_id', 'user_id']], how='left', on='spotify_id')
+    fact_songs_df = pd.merge(fact_songs_df, dim_user_df[['user_id', 'dim_user_id']], how='left', on='user_id')
     
     fact_songs_df = fact_songs_df[[
         'dim_playlist_id',
         'dim_artist_id',
         'dim_track_id',
+        'dim_user_id',
+        'dim_platform_id',
         'added_at',
-        'is_local'
+        'is_local',
     ]]
 
     upload_dataframe_to_bigquery(fact_songs_df, 'fact_songs.fact_songs')
@@ -197,6 +249,7 @@ def main(request):
     create_playlist_dimension()
     create_artist_dimension()
     create_track_dimension()
+    create_user_dimension()
     create_fact_songs()
 
     return 'Transformation completed.'
