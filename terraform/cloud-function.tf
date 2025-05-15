@@ -7,7 +7,7 @@ data "archive_file" "extract_function_zip" {
 resource "google_storage_bucket_object" "extract_function_object" {
     source = data.archive_file.extract_function_zip.output_path
     content_type = "application/zip"
-    name = "extract.zip"
+    name = "extract-${data.archive_file.extract_function_zip.output_md5}.zip"
     bucket = google_storage_bucket.cloud_functions_bucket.name
     depends_on = [
         google_storage_bucket.cloud_functions_bucket,
@@ -63,7 +63,7 @@ data "archive_file" "transform_function_zip" {
 resource "google_storage_bucket_object" "transform_function_object" {
     source = data.archive_file.transform_function_zip.output_path
     content_type = "application/zip"
-    name = "transform.zip"
+    name = "transform-${data.archive_file.extract_function_zip.output_md5}.zip"
     bucket = google_storage_bucket.cloud_functions_bucket.name
     depends_on = [
         google_storage_bucket.cloud_functions_bucket,

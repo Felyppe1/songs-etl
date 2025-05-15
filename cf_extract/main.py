@@ -297,7 +297,6 @@ def extract_spotify_tracks():
     )
 
 
-
 @functions_framework.http
 def main(request):
     get_secret_manager_secret()
