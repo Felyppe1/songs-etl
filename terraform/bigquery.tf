@@ -45,11 +45,6 @@ resource "google_bigquery_table" "dim_platform" {
             "type": "STRING"
         },
         {
-            "name": "platform_id",
-            "description": "Identifier of the platform",
-            "type": "STRING"
-        },
-        {
             "name": "name",
             "description": "Plataform name",
             "type": "STRING"
@@ -226,11 +221,6 @@ resource "google_bigquery_table" "fact_songs" {
             "type": "STRING"
         },
         {
-            "name": "date_id",
-            "description": "Foreign key to dim_date",
-            "type": "STRING"
-        },
-        {
             "name": "added_at",
             "description": "Timestamp when the song was added",
             "type": "TIMESTAMP"
@@ -239,11 +229,6 @@ resource "google_bigquery_table" "fact_songs" {
             "name": "is_local",
             "description": "Whether the song is a local file",
             "type": "BOOLEAN"
-        },
-        {
-            "name": "position_in_playlist",
-            "description": "Position of the song in the playlist",
-            "type": "INTEGER"
         }
     ]
     SCHEMA

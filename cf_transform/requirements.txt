@@ -6,3 +6,4 @@ pandas-gbq==0.*
 requests==2.*
 python-dotenv==1.*
 cuid2==2.*
+asyncio==3.*

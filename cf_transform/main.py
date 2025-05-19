@@ -9,6 +9,7 @@ from google.cloud.storage import Blob
 from datetime import date
 from cuid2 import Cuid
 from google.cloud import bigquery
+import asyncio
 
 
 load_dotenv(override=True)
@@ -57,8 +58,13 @@ def retrieve_blobs_from_bucket(bucket_name, object_path) -> List[Blob]:
 def upload_dataframe_to_bigquery(df, dataset_table):
     client = bigquery.Client()
 
+    table = client.get_table(dataset_table)
+    schema = table.schema
+
+    # TODO: enable schema validation again
     job_config = bigquery.LoadJobConfig(
-        write_disposition='WRITE_TRUNCATE'
+        write_disposition='WRITE_TRUNCATE',
+        # schema=schema
     )
 
     try:
@@ -82,10 +88,14 @@ def execute_bigquery_query(query):
 # Steps of the transformation
 ###################################################################################
 
-def create_playlist_dimension():
+async def create_playlist_dimension():
     print('CREATE PLAYLIST DIMENSION')
 
-    users_playlists = retrieve_object_from_bucket(f'landing-{PROJECT_ID}', f'spotify/playlists/{date.today()}.json')
+    users_playlists = await asyncio.to_thread(
+        retrieve_object_from_bucket,
+        f'landing-{PROJECT_ID}',
+        f'spotify/playlists/{date.today()}.json'
+    )
 
     playlists = []
 
@@ -99,19 +109,27 @@ def create_playlist_dimension():
     
     playlists_df = pd.DataFrame(playlists).drop_duplicates()
 
-    upload_dataframe_to_bigquery(playlists_df, 'fact_songs.dim_playlist')
+    await asyncio.to_thread(
+        upload_dataframe_to_bigquery,
+        playlists_df,
+        'fact_songs.dim_playlist'
+    )
 
-def create_artist_dimension():
+async def create_artist_dimension():
     print('CREATE ARTIST DIMENSION')
 
-    playlists_tracks = retrieve_object_from_bucket(f'landing-{PROJECT_ID}', f'spotify/tracks/{date.today()}.json')
+    playlists_tracks = await asyncio.to_thread(
+        retrieve_object_from_bucket,
+        f'landing-{PROJECT_ID}',
+        f'spotify/tracks/{date.today()}.json'
+    )
 
     artists = []
 
     for playlist_tracks in playlists_tracks:
         for track in playlist_tracks['tracks']:
             for artist in track['artists']:
-                if artist['id'] == None:
+                if artist['id'] is None:
                     continue
 
                 artists.append({
@@ -120,35 +138,43 @@ def create_artist_dimension():
                 })
     
     dim_artists_df = pd.DataFrame(artists).drop_duplicates()
-
     dim_artists_df['dim_artist_id'] = [CUID_GENERATOR.generate() for _ in range(len(dim_artists_df))]
 
-    upload_dataframe_to_bigquery(dim_artists_df, 'fact_songs.dim_artist')
+    await asyncio.to_thread(
+        upload_dataframe_to_bigquery,
+        dim_artists_df,
+        'fact_songs.dim_artist'
+    )
 
-def create_track_dimension():
+
+async def create_track_dimension():
     print('CREATE TRACK DIMENSION')
 
-    playlists_tracks = retrieve_object_from_bucket(f'landing-{PROJECT_ID}', f'spotify/tracks/{date.today()}.json')
+    playlists_tracks = await asyncio.to_thread(
+        retrieve_object_from_bucket,
+        f'landing-{PROJECT_ID}',
+        f'spotify/tracks/{date.today()}.json'
+    )
 
     tracks = []
 
     for playlist_tracks in playlists_tracks:
         for track in playlist_tracks['tracks']:
-            track_id = track['id']
-            track_name = track['name']
-
             tracks.append({
-                'track_id': track_id,
-                'name': track_name,
+                'track_id': track['id'],
+                'name': track['name'],
             })
     
     dim_track_df = pd.DataFrame(tracks).drop_duplicates()
-
     dim_track_df['dim_track_id'] = [CUID_GENERATOR.generate() for _ in range(len(dim_track_df))]
 
-    upload_dataframe_to_bigquery(dim_track_df, 'fact_songs.dim_track')
+    await asyncio.to_thread(
+        upload_dataframe_to_bigquery,
+        dim_track_df,
+        'fact_songs.dim_track'
+    )
 
-def create_platform_dimension():
+async def create_platform_dimension():
     print('CREATE PLATFORM DIMENSION')
 
     platforms = [
@@ -160,21 +186,33 @@ def create_platform_dimension():
 
     dim_platform_df = pd.DataFrame(platforms)
 
-    upload_dataframe_to_bigquery(dim_platform_df, 'fact_songs.dim_platform')
+    await asyncio.to_thread(
+        upload_dataframe_to_bigquery,
+        dim_platform_df,
+        'fact_songs.dim_platform'
+    )
 
-def create_user_dimension():
+async def create_user_dimension():
     print('CREATE USER DIMENSION')
 
-    users_df = execute_bigquery_query("""
-    SELECT *
-    FROM fact_songs.users
-    """)
+    users_df = await asyncio.to_thread(
+        execute_bigquery_query,
+        """
+        SELECT *
+        FROM fact_songs.users
+        """
+    )
 
     users_df['dim_user_id'] = [CUID_GENERATOR.generate() for _ in range(len(users_df))]
 
-    upload_dataframe_to_bigquery(users_df, 'fact_songs.dim_user')
+    await asyncio.to_thread(
+        upload_dataframe_to_bigquery,
+        users_df,
+        'fact_songs.dim_user'
+    )
 
-def create_fact_songs():
+
+async def create_fact_songs():
     print('CREATE FACT SONGS')
 
     users_playlists = retrieve_object_from_bucket(f'landing-{PROJECT_ID}', f'spotify/playlists/{date.today()}.json')
@@ -241,6 +279,9 @@ def create_fact_songs():
     fact_songs_df = pd.merge(fact_songs_df, users_df[['spotify_id', 'user_id']], how='left', on='spotify_id')
     fact_songs_df = pd.merge(fact_songs_df, dim_user_df[['user_id', 'dim_user_id']], how='left', on='user_id')
     
+    # TODO: deal with date column
+    # fact_songs_df['added_at'] = pd.to_datetime(fact_songs_df['added_at'], unit='us', errors='raise')
+
     fact_songs_df = fact_songs_df[[
         'dim_playlist_id',
         'dim_artist_id',
@@ -251,15 +292,31 @@ def create_fact_songs():
         'is_local',
     ]]
 
+    # fact_songs_df = fact_songs_df.astype({
+    #     "dim_playlist_id": str,
+    #     "dim_artist_id": str,
+    #     "dim_track_id": str,
+    #     "dim_user_id": str,
+    #     "dim_platform_id": str,
+    #     "added_at": "datetime64[ns]",
+    #     "is_local": bool,
+    # })
+
     upload_dataframe_to_bigquery(fact_songs_df, 'fact_songs.fact_songs')
 
+async def create_all_tables():
+    await asyncio.gather(
+        create_platform_dimension(),
+        create_playlist_dimension(),
+        create_artist_dimension(),
+        create_track_dimension(),
+        create_user_dimension(),
+    )
+    
+    await create_fact_songs()
 
 @functions_framework.http
 def main(request):
-    create_playlist_dimension()
-    create_artist_dimension()
-    create_track_dimension()
-    create_user_dimension()
-    create_fact_songs()
+    asyncio.run(create_all_tables())
 
     return 'Transformation completed.'
