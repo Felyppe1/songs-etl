@@ -193,6 +193,7 @@ resource "google_bigquery_table" "fact_songs" {
     dataset_id = google_bigquery_dataset.fact_songs.dataset_id
     table_id   = "fact_songs"
     description = "Fact table for songs added to playlists"
+    clustering = [ "dim_platform_id", "dim_playlist_id", "dim_user_id" ]
     schema = <<SCHEMA
     [
         {

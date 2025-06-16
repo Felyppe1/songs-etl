@@ -61,10 +61,9 @@ def upload_dataframe_to_bigquery(df, dataset_table):
     table = client.get_table(dataset_table)
     schema = table.schema
 
-    # TODO: enable schema validation again
     job_config = bigquery.LoadJobConfig(
         write_disposition='WRITE_TRUNCATE',
-        # schema=schema
+        schema=schema
     )
 
     try:
@@ -279,9 +278,6 @@ async def create_fact_songs():
     fact_songs_df = pd.merge(fact_songs_df, users_df[['spotify_id', 'user_id']], how='left', on='spotify_id')
     fact_songs_df = pd.merge(fact_songs_df, dim_user_df[['user_id', 'dim_user_id']], how='left', on='user_id')
     
-    # TODO: deal with date column
-    # fact_songs_df['added_at'] = pd.to_datetime(fact_songs_df['added_at'], unit='us', errors='raise')
-
     fact_songs_df = fact_songs_df[[
         'dim_playlist_id',
         'dim_artist_id',
@@ -292,15 +288,7 @@ async def create_fact_songs():
         'is_local',
     ]]
 
-    # fact_songs_df = fact_songs_df.astype({
-    #     "dim_playlist_id": str,
-    #     "dim_artist_id": str,
-    #     "dim_track_id": str,
-    #     "dim_user_id": str,
-    #     "dim_platform_id": str,
-    #     "added_at": "datetime64[ns]",
-    #     "is_local": bool,
-    # })
+    fact_songs_df['added_at'] = pd.to_datetime(fact_songs_df['added_at'], errors='coerce')
 
     upload_dataframe_to_bigquery(fact_songs_df, 'fact_songs.fact_songs')
 
