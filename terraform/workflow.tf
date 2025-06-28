@@ -65,10 +65,6 @@ resource "google_workflows_workflow" "songs_etl_workflow" {
                             url: "${google_cloudfunctions2_function.create_users_dimension_function.service_config[0].uri}"
                             auth:
                                 type: OIDC
-        - logDimensionsResponse:
-            call: sys.log
-            args:
-                text: "$${dimensions_response}"
         - transform:
             call: http.post
             args:
