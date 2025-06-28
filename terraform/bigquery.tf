@@ -1,13 +1,13 @@
-resource "google_bigquery_dataset" "fact_songs" {
+resource "google_bigquery_dataset" "oltp_system" {
     project = var.project
-    dataset_id = "fact_songs"
-    description = "Dataset for multidimensional modeling about playlists management by a user in a platform"
+    dataset_id = "oltp_system"
+    description = "Dataset for simulating data from an oltp system"
     location = var.region
 }
 
 resource "google_bigquery_table" "users" {
     project    = var.project
-    dataset_id = google_bigquery_dataset.fact_songs.dataset_id
+    dataset_id = google_bigquery_dataset.oltp_system.dataset_id
     table_id   = "users"
     description = "Table of users from music platforms"
     schema = <<SCHEMA
@@ -29,6 +29,61 @@ resource "google_bigquery_table" "users" {
         }
     ]
     SCHEMA
+}
+
+resource "google_bigquery_dataset" "prep_songs_facts" {
+    project = var.project
+    dataset_id = "prep_songs_facts"
+    description = "Dataset for the fact tables of the user's playlists management in a platform"
+    location = var.region
+}
+
+resource "google_bigquery_table" "fact_songs" {
+    project    = var.project
+    dataset_id = google_bigquery_dataset.prep_songs_facts.dataset_id
+    table_id   = "fact_songs"
+    description = "Fact table for songs added to playlists"
+    clustering = [ "dim_platform_id", "dim_playlist_id", "dim_user_id" ]
+    schema = <<SCHEMA
+    [
+        {
+            "name": "dim_platform_id",
+            "description": "Foreign key to dim_platform",
+            "type": "STRING"
+        },
+        {
+            "name": "dim_playlist_id",
+            "description": "Foreign key to dim_playlist",
+            "type": "STRING"
+        },
+        {
+            "name": "dim_artist_id",
+            "description": "Foreign key to dim_artist",
+            "type": "STRING"
+        },
+        {
+            "name": "dim_track_id",
+            "description": "Foreign key to dim_track",
+            "type": "STRING"
+        },
+        {
+            "name": "dim_user_id",
+            "description": "Foreign key to dim_user",
+            "type": "STRING"
+        },
+        {
+            "name": "added_at",
+            "description": "Timestamp when the song was added",
+            "type": "TIMESTAMP"
+        },
+        {
+            "name": "is_local",
+            "description": "Whether the song is a local file",
+            "type": "BOOLEAN"
+        }
+    ]
+    SCHEMA
+    deletion_protection=false
 }
 
 
@@ -147,54 +202,6 @@ resource "google_bigquery_table" "dim_track" {
             "name": "name",
             "description": "Track name",
             "type": "STRING"
-        }
-    ]
-    SCHEMA
-    deletion_protection=false
-}
-
-resource "google_bigquery_table" "prep_songs_dimensions" {
-    project    = var.project
-    dataset_id = google_bigquery_dataset.prep_songs_dimensions.dataset_id
-    table_id   = "prep_songs_dimensions"
-    description = "Fact table for songs added to playlists"
-    clustering = [ "dim_platform_id", "dim_playlist_id", "dim_user_id" ]
-    schema = <<SCHEMA
-    [
-        {
-            "name": "dim_platform_id",
-            "description": "Foreign key to dim_platform",
-            "type": "STRING"
-        },
-        {
-            "name": "dim_playlist_id",
-            "description": "Foreign key to dim_playlist",
-            "type": "STRING"
-        },
-        {
-            "name": "dim_artist_id",
-            "description": "Foreign key to dim_artist",
-            "type": "STRING"
-        },
-        {
-            "name": "dim_track_id",
-            "description": "Foreign key to dim_track",
-            "type": "STRING"
-        },
-        {
-            "name": "dim_user_id",
-            "description": "Foreign key to dim_user",
-            "type": "STRING"
-        },
-        {
-            "name": "added_at",
-            "description": "Timestamp when the song was added",
-            "type": "TIMESTAMP"
-        },
-        {
-            "name": "is_local",
-            "description": "Whether the song is a local file",
-            "type": "BOOLEAN"
         }
     ]
     SCHEMA
