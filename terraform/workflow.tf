@@ -22,6 +22,44 @@ resource "google_workflows_workflow" "songs_etl_workflow" {
             call: sys.log
             args:
                 text: "$${extract_response.body}"
+        - createDimensions:
+            parallel:
+                branches:
+                - createArtistsDimension:
+                    call: http.post
+                    args:
+                        url: "${google_cloudfunctions2_function.create_artists_dimension_function.service_config[0].uri}"
+                        auth:
+                            type: OIDC
+                - createPlatformsDimension:
+                    call: http.post
+                    args:
+                        url: "${google_cloudfunctions2_function.create_platforms_dimension_function.service_config[0].uri}"
+                        auth:
+                            type: OIDC
+                - createPlaylistsDimension:
+                    call: http.post
+                    args:
+                        url: "${google_cloudfunctions2_function.create_playlists_dimension_function.service_config[0].uri}"
+                        auth:
+                            type: OIDC
+                - createTracksDimension:
+                    call: http.post
+                    args:
+                        url: "${google_cloudfunctions2_function.create_tracks_dimension_function.service_config[0].uri}"
+                        auth:
+                            type: OIDC
+                - createUsersDimension:
+                    call: http.post
+                    args:
+                        url: "${google_cloudfunctions2_function.create_users_dimension_function.service_config[0].uri}"
+                        auth:
+                            type: OIDC
+            result: dimensions_response
+        - logDimensionsResponse:
+            call: sys.log
+            args:
+                text: "$${dimensions_response}"
         - transform:
             call: http.post
             args:
@@ -38,6 +76,11 @@ resource "google_workflows_workflow" "songs_etl_workflow" {
     depends_on = [
         google_project_service.required_apis["workflowexecutions.googleapis.com"],
         google_cloudfunctions2_function.extract_cloud_function,
-        google_cloudfunctions2_function.transform_cloud_function
+        google_cloudfunctions2_function.transform_cloud_function,
+        google_cloudfunctions2_function.create_artists_dimension_function,
+        google_cloudfunctions2_function.create_platforms_dimension_function,
+        google_cloudfunctions2_function.create_playlists_dimension_function,
+        google_cloudfunctions2_function.create_tracks_dimension_function,
+        google_cloudfunctions2_function.create_users_dimension_function
     ]
 }

@@ -32,9 +32,20 @@ resource "google_bigquery_table" "users" {
 }
 
 
+
+
+
+
+resource "google_bigquery_dataset" "prep_songs_dimensions" {
+    project = var.project
+    dataset_id = "prep_songs_dimensions"
+    description = "Dataset for the dimensions of the user's playlists management in a platform"
+    location = var.region
+}
+
 resource "google_bigquery_table" "dim_platform" {
     project = var.project
-    dataset_id = google_bigquery_dataset.fact_songs.dataset_id
+    dataset_id = google_bigquery_dataset.prep_songs_dimensions.dataset_id
     table_id = "dim_platform"
     description = "Dimension table for platforms"
     schema = <<SCHEMA
@@ -55,7 +66,7 @@ resource "google_bigquery_table" "dim_platform" {
 
 resource "google_bigquery_table" "dim_playlist" {
     project = var.project
-    dataset_id = google_bigquery_dataset.fact_songs.dataset_id
+    dataset_id = google_bigquery_dataset.prep_songs_dimensions.dataset_id
     table_id = "dim_playlist"
     description = "Dimension table for playlists"
     schema = <<SCHEMA
@@ -63,11 +74,6 @@ resource "google_bigquery_table" "dim_playlist" {
         {
             "name": "dim_playlist_id",
             "description": "Surrogate key of the playlist",
-            "type": "STRING"
-        },
-        {
-            "name": "playlist_id",
-            "description": "Identifier of the playlist in the platform",
             "type": "STRING"
         },
         {
@@ -79,40 +85,9 @@ resource "google_bigquery_table" "dim_playlist" {
     SCHEMA
 }
 
-resource "google_bigquery_table" "dim_date" {
-    project    = var.project
-    dataset_id = google_bigquery_dataset.fact_songs.dataset_id
-    table_id   = "dim_date"
-    description = "Dimension table for dates"
-    schema = <<SCHEMA
-    [
-        {
-            "name": "date_id",
-            "description": "Date identifier (e.g., YYYYMMDD)",
-            "type": "STRING"
-        },
-        {
-            "name": "day",
-            "description": "Day of the month",
-            "type": "INTEGER"
-        },
-        {
-            "name": "month",
-            "description": "Month number",
-            "type": "INTEGER"
-        },
-        {
-            "name": "year",
-            "description": "Year number",
-            "type": "INTEGER"
-        }
-    ]
-    SCHEMA
-}
-
 resource "google_bigquery_table" "dim_user" {
     project    = var.project
-    dataset_id = google_bigquery_dataset.fact_songs.dataset_id
+    dataset_id = google_bigquery_dataset.prep_songs_dimensions.dataset_id
     table_id   = "dim_user"
     description = "Dimension table for users"
     schema = <<SCHEMA
@@ -120,11 +95,6 @@ resource "google_bigquery_table" "dim_user" {
         {
             "name": "dim_user_id",
             "description": "Surrogate key of the user",
-            "type": "STRING"
-        },
-        {
-            "name": "user_id",
-            "description": "Identifier of the user",
             "type": "STRING"
         },
         {
@@ -138,19 +108,14 @@ resource "google_bigquery_table" "dim_user" {
 
 resource "google_bigquery_table" "dim_artist" {
     project    = var.project
-    dataset_id = google_bigquery_dataset.fact_songs.dataset_id
+    dataset_id = google_bigquery_dataset.prep_songs_dimensions.dataset_id
     table_id   = "dim_artist"
     description = "Dimension table for artists"
     schema = <<SCHEMA
     [
         {
             "name": "dim_artist_id",
-            "description": "Surrogate key of the playlist",
-            "type": "STRING"
-        },
-        {
-            "name": "artist_id",
-            "description": "Identifier of the artist in the platform",
+            "description": "Surrogate key of the artist",
             "type": "STRING"
         },
         {
@@ -164,7 +129,7 @@ resource "google_bigquery_table" "dim_artist" {
 
 resource "google_bigquery_table" "dim_track" {
     project    = var.project
-    dataset_id = google_bigquery_dataset.fact_songs.dataset_id
+    dataset_id = google_bigquery_dataset.prep_songs_dimensions.dataset_id
     table_id   = "dim_track"
     description = "Dimension table for tracks"
     schema = <<SCHEMA
@@ -172,11 +137,6 @@ resource "google_bigquery_table" "dim_track" {
         {
             "name": "dim_track_id",
             "description": "Surrogate key of the track",
-            "type": "STRING"
-        },
-        {
-            "name": "track_id",
-            "description": "Identifier of the track in the platform",
             "type": "STRING"
         },
         {
@@ -188,10 +148,10 @@ resource "google_bigquery_table" "dim_track" {
     SCHEMA
 }
 
-resource "google_bigquery_table" "fact_songs" {
+resource "google_bigquery_table" "prep_songs_dimensions" {
     project    = var.project
-    dataset_id = google_bigquery_dataset.fact_songs.dataset_id
-    table_id   = "fact_songs"
+    dataset_id = google_bigquery_dataset.prep_songs_dimensions.dataset_id
+    table_id   = "prep_songs_dimensions"
     description = "Fact table for songs added to playlists"
     clustering = [ "dim_platform_id", "dim_playlist_id", "dim_user_id" ]
     schema = <<SCHEMA

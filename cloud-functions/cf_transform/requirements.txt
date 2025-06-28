@@ -1,0 +1,9 @@
+functions-framework==3.*
+google-cloud-storage==3.*
+google-cloud-bigquery==3.*
+pandas==2.*
+pandas-gbq==0.*
+requests==2.*
+python-dotenv==1.*
+cuid2==2.*
+asyncio==3.*
