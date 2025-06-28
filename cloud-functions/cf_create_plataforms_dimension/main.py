@@ -14,6 +14,14 @@ PROJECT_ID = os.getenv('PROJECT_ID')
 if not PROJECT_ID:
     raise ValueError("PROJECT_ID environment variable not set.")
 
+DATASET_ID = os.getenv('DATASET_ID')
+if not DATASET_ID:
+    raise ValueError("DATASET_ID environment variable not set.")
+
+TABLE_ID = os.getenv('TABLE_ID')
+if not TABLE_ID:
+    raise ValueError("TABLE_ID environment variable not set.")
+
 CUID_GENERATOR: Cuid = Cuid(length=10)
 
 # def retrieve_object_from_bucket(bucket_name, object_path):
@@ -67,7 +75,7 @@ def main(request):
 
     upload_dataframe_to_bigquery(
         dim_platform_df,
-        'fact_songs.dim_platform'
+        f'{DATASET_ID}.{TABLE_ID}'
     )
 
     return 'Transformation completed.'

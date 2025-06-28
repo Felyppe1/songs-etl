@@ -153,11 +153,15 @@ resource "google_cloudfunctions2_function" "create_artists_dimension_function" {
         timeout_seconds = 400
         environment_variables = {
             PROJECT_ID = "${var.project}"
+            DATASET_ID = google_bigquery_dataset.prep_songs_dimensions.dataset_id
+            TABLE_ID = google_bigquery_table.dim_artist.table_id
         }
     }
 
     depends_on = [
-        google_project_service.required_apis["cloudfunctions.googleapis.com"]
+        google_project_service.required_apis["cloudfunctions.googleapis.com"],
+        google_bigquery_dataset.prep_songs_dimensions,
+        google_bigquery_table.dim_artist
     ]
 }
 
@@ -207,11 +211,15 @@ resource "google_cloudfunctions2_function" "create_platforms_dimension_function"
         timeout_seconds = 400
         environment_variables = {
             PROJECT_ID = "${var.project}"
+            DATASET_ID = google_bigquery_dataset.prep_songs_dimensions.dataset_id
+            TABLE_ID = google_bigquery_table.dim_platform.table_id
         }
     }
 
     depends_on = [
-        google_project_service.required_apis["cloudfunctions.googleapis.com"]
+        google_project_service.required_apis["cloudfunctions.googleapis.com"],
+        google_bigquery_dataset.prep_songs_dimensions,
+        google_bigquery_table.dim_platform
     ]
 }
 
@@ -261,11 +269,15 @@ resource "google_cloudfunctions2_function" "create_playlists_dimension_function"
         timeout_seconds = 400
         environment_variables = {
             PROJECT_ID = "${var.project}"
+            DATASET_ID = google_bigquery_dataset.prep_songs_dimensions.dataset_id
+            TABLE_ID = google_bigquery_table.dim_playlist.table_id
         }
     }
 
     depends_on = [
-        google_project_service.required_apis["cloudfunctions.googleapis.com"]
+        google_project_service.required_apis["cloudfunctions.googleapis.com"],
+        google_bigquery_dataset.prep_songs_dimensions,
+        google_bigquery_table.dim_playlist
     ]
 }
 
@@ -315,11 +327,15 @@ resource "google_cloudfunctions2_function" "create_tracks_dimension_function" {
         timeout_seconds = 400
         environment_variables = {
             PROJECT_ID = "${var.project}"
+            DATASET_ID = google_bigquery_dataset.prep_songs_dimensions.dataset_id
+            TABLE_ID = google_bigquery_table.dim_track.table_id
         }
     }
 
     depends_on = [
-        google_project_service.required_apis["cloudfunctions.googleapis.com"]
+        google_project_service.required_apis["cloudfunctions.googleapis.com"],
+        google_bigquery_dataset.prep_songs_dimensions,
+        google_bigquery_table.dim_track
     ]
 }
 
@@ -369,10 +385,14 @@ resource "google_cloudfunctions2_function" "create_users_dimension_function" {
         timeout_seconds = 400
         environment_variables = {
             PROJECT_ID = "${var.project}"
+            DATASET_ID = google_bigquery_dataset.prep_songs_dimensions.dataset_id
+            TABLE_ID = google_bigquery_table.dim_user.table_id
         }
     }
 
     depends_on = [
-        google_project_service.required_apis["cloudfunctions.googleapis.com"]
+        google_project_service.required_apis["cloudfunctions.googleapis.com"],
+        google_bigquery_dataset.prep_songs_dimensions,
+        google_bigquery_table.dim_user
     ]
 }
