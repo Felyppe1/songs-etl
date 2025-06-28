@@ -62,6 +62,7 @@ resource "google_bigquery_table" "dim_platform" {
         }
     ]
     SCHEMA
+    deletion_protection=false
 }
 
 resource "google_bigquery_table" "dim_playlist" {
@@ -83,6 +84,7 @@ resource "google_bigquery_table" "dim_playlist" {
         }
     ]
     SCHEMA
+    deletion_protection=false
 }
 
 resource "google_bigquery_table" "dim_user" {
@@ -104,6 +106,7 @@ resource "google_bigquery_table" "dim_user" {
         }
     ]
     SCHEMA
+    deletion_protection=false
 }
 
 resource "google_bigquery_table" "dim_artist" {
@@ -125,6 +128,7 @@ resource "google_bigquery_table" "dim_artist" {
         }
     ]
     SCHEMA
+    deletion_protection=false
 }
 
 resource "google_bigquery_table" "dim_track" {
@@ -146,6 +150,7 @@ resource "google_bigquery_table" "dim_track" {
         }
     ]
     SCHEMA
+    deletion_protection=false
 }
 
 resource "google_bigquery_table" "prep_songs_dimensions" {
@@ -193,6 +198,5 @@ resource "google_bigquery_table" "prep_songs_dimensions" {
         }
     ]
     SCHEMA
-
     deletion_protection=false
 }
