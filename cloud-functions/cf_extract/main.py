@@ -102,7 +102,7 @@ def get_users_from_bigquery():
     client = bigquery.Client()
     query_job = client.query(f"""
         SELECT *
-        FROM fact_songs.users
+        FROM oltp_system.users
     """)
 
     rows = query_job.result()

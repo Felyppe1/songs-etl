@@ -75,7 +75,7 @@ def main(request):
     users_df = execute_bigquery_query(
         """
         SELECT *
-        FROM fact_songs.users
+        FROM oltp_system.users
         """
     ).to_dataframe()
 

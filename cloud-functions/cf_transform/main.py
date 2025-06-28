@@ -95,23 +95,23 @@ async def create_fact_songs():
 
     dim_playlist_df = execute_bigquery_query("""
     SELECT *
-    FROM fact_songs.dim_playlist
+    FROM prep_songs_dimensions.dim_playlist
     """)
     dim_artist_df = execute_bigquery_query("""
     SELECT *
-    FROM fact_songs.dim_artist
+    FROM prep_songs_dimensions.dim_artist
     """)
     dim_track_df = execute_bigquery_query("""
     SELECT *
-    FROM fact_songs.dim_track
+    FROM prep_songs_dimensions.dim_track
     """)
     dim_user_df = execute_bigquery_query("""
     SELECT *
-    FROM fact_songs.dim_user
+    FROM prep_songs_dimensions.dim_user
     """)
     users_df = execute_bigquery_query("""
     SELECT *
-    FROM fact_songs.users
+    FROM prep_songs_dimensions.users
     """)
 
     songs = []
@@ -166,7 +166,7 @@ async def create_fact_songs():
 
     fact_songs_df['added_at'] = pd.to_datetime(fact_songs_df['added_at'], errors='coerce')
 
-    upload_dataframe_to_bigquery(fact_songs_df, 'fact_songs.fact_songs')
+    upload_dataframe_to_bigquery(fact_songs_df, 'prep_songs_facts.fact_songs')
 
 async def create_all_tables():
     await create_fact_songs()
