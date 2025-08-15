@@ -64,7 +64,7 @@ data "archive_file" "transform_function_zip" {
 resource "google_storage_bucket_object" "transform_function_object" {
     source = data.archive_file.transform_function_zip.output_path
     content_type = "application/zip"
-    name = "transform-${data.archive_file.extract_function_zip.output_md5}.zip"
+    name = "transform-${data.archive_file.transform_function_zip.output_md5}.zip"
     bucket = google_storage_bucket.cloud_functions_bucket.name
     depends_on = [
         google_storage_bucket.cloud_functions_bucket,
@@ -97,6 +97,8 @@ resource "google_cloudfunctions2_function" "transform_cloud_function" {
         timeout_seconds = 400
         environment_variables = {
             PROJECT_ID = "${var.project}"
+            DATASET_ID = google_bigquery_dataset.prep_songs_facts.dataset_id
+            TABLE_ID = google_bigquery_table.fact_songs.table_id
         }
     }
 
@@ -336,63 +338,5 @@ resource "google_cloudfunctions2_function" "create_tracks_dimension_function" {
         google_project_service.required_apis["cloudfunctions.googleapis.com"],
         google_bigquery_dataset.prep_songs_dimensions,
         google_bigquery_table.dim_track
-    ]
-}
-
-###################################################################################################################
-# CREATE USERS DIMENSION
-###################################################################################################################
-
-data "archive_file" "create_users_dimension_zip" {
-    type = "zip"
-    source_dir = "${path.module}/../cloud-functions/cf_create_users_dimension"
-    output_path = "${path.module}/deploy/cf_create_users_dimension.zip"
-}
-
-resource "google_storage_bucket_object" "create_users_dimension_object" {
-    source = data.archive_file.create_users_dimension_zip.output_path
-    content_type = "application/zip"
-    name = "create-users-dimension-${data.archive_file.create_users_dimension_zip.output_md5}.zip"
-    bucket = google_storage_bucket.cloud_functions_bucket.name
-    depends_on = [
-        google_storage_bucket.cloud_functions_bucket,
-        data.archive_file.create_users_dimension_zip
-    ]
-}
-
-resource "google_cloudfunctions2_function" "create_users_dimension_function" {
-    name = "create-users-dimension"
-    location = var.region
-    project = var.project
-    description = "Cloud function to create the users dimension in BigQuery"
-
-    build_config {
-        runtime = "python312"
-        entry_point = "main"
-
-        source {
-            storage_source {
-                bucket = google_storage_bucket.cloud_functions_bucket.name
-                object = google_storage_bucket_object.create_users_dimension_object.name
-            }
-        }
-    }
-
-    service_config {
-        max_instance_count = 1
-        available_memory   = "1Gi"
-        available_cpu      = "0.583"
-        timeout_seconds = 400
-        environment_variables = {
-            PROJECT_ID = "${var.project}"
-            DATASET_ID = google_bigquery_dataset.prep_songs_dimensions.dataset_id
-            TABLE_ID = google_bigquery_table.dim_user.table_id
-        }
-    }
-
-    depends_on = [
-        google_project_service.required_apis["cloudfunctions.googleapis.com"],
-        google_bigquery_dataset.prep_songs_dimensions,
-        google_bigquery_table.dim_user
     ]
 }

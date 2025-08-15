@@ -102,7 +102,7 @@ def get_users_from_bigquery():
     client = bigquery.Client()
     query_job = client.query(f"""
         SELECT *
-        FROM oltp_system.users
+        FROM prep_songs_dimensions.dim_user
     """)
 
     rows = query_job.result()
@@ -214,6 +214,7 @@ def extract_spotify_playlists():
 
     for user in users:
         print(f'Getting playlists from user: {user["name"]}')
+        # TODO: paralelizar
         playlists = get_playlists_by_user_id(user['spotify_id'])
 
         playlists_dict = {

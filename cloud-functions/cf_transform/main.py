@@ -18,6 +18,14 @@ PROJECT_ID = os.getenv('PROJECT_ID')
 if not PROJECT_ID:
     raise ValueError("PROJECT_ID environment variable not set.")
 
+DATASET_ID = os.getenv('DATASET_ID')
+if not DATASET_ID:
+    raise ValueError("DATASET_ID environment variable not set.")
+
+TABLE_ID = os.getenv('TABLE_ID')
+if not TABLE_ID:
+    raise ValueError("TABLE_ID environment variable not set.")
+
 CUID_GENERATOR: Cuid = Cuid(length=10)
 
 ###################################################################################
@@ -93,6 +101,7 @@ async def create_fact_songs():
     users_playlists = retrieve_object_from_bucket(f'landing-{PROJECT_ID}', f'spotify/playlists/{date.today()}.json')
     playlists_tracks = retrieve_object_from_bucket(f'landing-{PROJECT_ID}', f'spotify/tracks/{date.today()}.json')
 
+    # TODO: get all of these table ids from env variables
     dim_playlist_df = execute_bigquery_query("""
     SELECT *
     FROM prep_songs_dimensions.dim_playlist
@@ -108,10 +117,6 @@ async def create_fact_songs():
     dim_user_df = execute_bigquery_query("""
     SELECT *
     FROM prep_songs_dimensions.dim_user
-    """)
-    users_df = execute_bigquery_query("""
-    SELECT *
-    FROM prep_songs_dimensions.users
     """)
 
     songs = []
@@ -147,13 +152,12 @@ async def create_fact_songs():
 
     fact_songs_df = pd.DataFrame(songs).drop_duplicates()
 
-    fact_songs_df = pd.merge(fact_songs_df, dim_playlist_df, how='left', on='playlist_id')
-    fact_songs_df = pd.merge(fact_songs_df, dim_artist_df, how='left', on='artist_id')
-    fact_songs_df = pd.merge(fact_songs_df, dim_track_df, how='left', on='track_id')
+    fact_songs_df = pd.merge(fact_songs_df, dim_playlist_df, how='left', left_on='playlist_id', right_on='dim_playlist_id')
+    fact_songs_df = pd.merge(fact_songs_df, dim_artist_df, how='left', left_on='artist_id', right_on='dim_artist_id')
+    fact_songs_df = pd.merge(fact_songs_df, dim_track_df, how='left', left_on='track_id', right_on='dim_track_id')
 
-    fact_songs_df = pd.merge(fact_songs_df, users_df[['spotify_id', 'user_id']], how='left', on='spotify_id')
-    fact_songs_df = pd.merge(fact_songs_df, dim_user_df[['user_id', 'dim_user_id']], how='left', on='user_id')
-    
+    fact_songs_df = pd.merge(fact_songs_df, dim_user_df[['spotify_id', 'dim_user_id']], how='left', on='spotify_id')
+
     fact_songs_df = fact_songs_df[[
         'dim_playlist_id',
         'dim_artist_id',
@@ -166,7 +170,10 @@ async def create_fact_songs():
 
     fact_songs_df['added_at'] = pd.to_datetime(fact_songs_df['added_at'], errors='coerce')
 
-    upload_dataframe_to_bigquery(fact_songs_df, 'prep_songs_facts.fact_songs')
+    upload_dataframe_to_bigquery(
+        fact_songs_df,
+        f'{DATASET_ID}.{TABLE_ID}'
+    )
 
 async def create_all_tables():
     await create_fact_songs()

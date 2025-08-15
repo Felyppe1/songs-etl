@@ -1,36 +1,3 @@
-resource "google_bigquery_dataset" "oltp_system" {
-    project = var.project
-    dataset_id = "oltp_system"
-    description = "Dataset for simulating data from an oltp system"
-    location = var.region
-}
-
-resource "google_bigquery_table" "users" {
-    project    = var.project
-    dataset_id = google_bigquery_dataset.oltp_system.dataset_id
-    table_id   = "users"
-    description = "Table of users from music platforms"
-    schema = <<SCHEMA
-    [
-        {
-            "name": "user_id",
-            "description": "User identifier",
-            "type": "STRING"
-        },
-        {
-            "name": "spotify_id",
-            "description": "User identifier on the Spotify",
-            "type": "STRING"
-        },
-        {
-            "name": "name",
-            "description": "Person's name (does not need to be full)",
-            "type": "STRING"
-        }
-    ]
-    SCHEMA
-}
-
 resource "google_bigquery_dataset" "prep_songs_facts" {
     project = var.project
     dataset_id = "prep_songs_facts"
@@ -157,6 +124,11 @@ resource "google_bigquery_table" "dim_user" {
         {
             "name": "name",
             "description": "User name",
+            "type": "STRING"
+        },
+        {
+            "name": "spotify_id",
+            "description": "User identifier on the Spotify",
             "type": "STRING"
         }
     ]
