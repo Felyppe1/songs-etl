@@ -1,4 +1,12 @@
-# Configuração do Projeto Localmente
+# ETL de Músicas
+
+Este projeto foi desenvolvido para praticar conceitos de engenharia de dados, criando um pipeline ETL que centraliza informações de músicas, playlists e usuários em um modelo dimensional (star schema).
+
+Atualmente, o ETL integra dados apenas do Spotify, mas o desenho da solução foi planejado para suportar múltiplas plataformas de streaming no futuro
+
+## Diagrama da solução
+
+![Diagrama do ETL de Músicas](docs/songs-etl.png)
 
 ## Passos para Configuração
 
